@@ -1,0 +1,38 @@
+# default ignore for django
+*.pyc
+*~
+__pycache__
+myvenv
+db.sqlite3
+/app/static
+.DS_Store
+
+# vscode editor
+.vscode/
+
+# venv
+/*env
+.idea/
+
+# celery/redis
+celerybeat-schedule.db
+dump.rdb
+
+# Local Setting
+local_settings.py
+
+# image storage
+/images/
+
+# celery local database 
+celerybeat-schedule
+
+/node_modules
+
+# other setting
+uwsgi_params
+test-1.py
+test.py
+*.sock
+udo lsof -i tcp:80 | egrep LISTEN
+*.env
