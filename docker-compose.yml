@@ -3,6 +3,7 @@ version: '3'
 
 services:
   api:
+    # working_dir: /app
     build: 
       context: .
       dockerfile: app.dockerfile

@@ -9,12 +9,12 @@ from rest_framework.response import Response
 
 class APIHandler:
     @staticmethod
-    def success(data=None, code=0):
-        return Response({'code': code, 'data': data})
+    def success(data, code):
+        return Response({'code': '003'+code, 'data': data})
     
     @staticmethod
-    def free(msg, code=1):
-        return Response({'code': code, 'msg': msg})
+    def catch(data, code):
+        return Response({'code': '003'+code, 'data': data})
 
     @staticmethod
     def fail(msg, code=99):

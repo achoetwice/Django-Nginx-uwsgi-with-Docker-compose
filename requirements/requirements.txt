@@ -7,3 +7,4 @@ urllib3==1.24.3
 pytz==2019.1
 django-split-settings==0.3.0
 djangorestframework==3.9.3
+pycrypto==2.6.1

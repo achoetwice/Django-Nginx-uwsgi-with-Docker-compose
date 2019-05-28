@@ -694,7 +694,7 @@ class GuestInfos(models.Model):
 
 
 class GuestTemporaryInfo(models.Model):
-    id = models.CharField(default=uuid.uuid4, primary_key=True, unique=True, max_length=255)
+    id = models.CharField(default=str(uuid.uuid4())[0:8], primary_key=True, unique=True, max_length=255)
     email = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -703,6 +703,7 @@ class GuestTemporaryInfo(models.Model):
     schedule_id = models.CharField(max_length=255)
     auto_create_account = models.BooleanField(default=False)
     created_at = models.DateTimeField(blank=True, null=True)
+    guest_id = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.created_at = timezone.now()
@@ -1259,6 +1260,7 @@ class Transaction(models.Model):
     lej_coupon_price = models.FloatField(blank=True, null=True)
     stripe_charge_id = models.CharField(max_length=255, blank=True, null=True)
     ecpay_merchant_trade_no = models.CharField(max_length=255, blank=True, null=True)
+    newebpay_merchant_trade_no = models.CharField(max_length=255, blank=True, null=True)
     device_type = models.IntegerField()
     message_id = models.CharField(max_length=100, blank=True, null=True)
 
