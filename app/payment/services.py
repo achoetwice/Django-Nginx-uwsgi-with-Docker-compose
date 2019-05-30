@@ -612,11 +612,35 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
     # Delete temporary guest info
     temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
     temp_guest.delete()
-    
     # Send email if Transaction done
 
     # Wait till Joe complete
     return '014'
+
+@transaction.atomic
+def Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners):
+    # Get payment informations
+    credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
+    # Get all needed class info by schedule_id
+    class_info = GetClassInfo(schedule_id)
+    print ('class_info', class_info)
+
+    # Lock vacancy and update
+    learner_count = len(learners)
+    lock = Update_Vacancy(schedule_id, learner_count)
+    if not lock:
+        return APIHandler.catch('Vacancy not enough or schedule error', code='012')
+    
+    # Start transaction to transactions
+    trans = Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
+    if trans == '006':
+        return '006'
+    elif trans == '013':
+        return '013'
+    elif trans == '014':
+        return '014'
+    else:
+        return '017'
 
 @transaction.atomic
 def Upate_Counter_Transaction(temp_id):

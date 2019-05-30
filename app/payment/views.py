@@ -32,7 +32,7 @@ class StoreGuestTempInfo(APIView):
         schedule_id = request.data.get('schedule_id')
         auto_create_account = request.data.get('auto_create_account', 0)
         print ('temp guest info, ', type(learners))
-        if not email or not first_name or not last_name or not customer_mobile:
+        if not email or not first_name or not last_name or not customer_mobile or not auto_create_account:
             return APIHandler.catch('lack of informations', code='001')
         
 
@@ -80,27 +80,21 @@ class GuestPaynow(APIView):
             return APIHandler.catch('No vacancy', code='008')
 
         # # # Confirm age is valid
-        # # For edPOS, age_check is done before payment
-        # for learner in learners:
-        #     Allow = CheckAgeValidation(learner, schedule_id)
-        #     if not Allow:
-        #         return APIHandler.catch('Age not fit')
 
         guest_id = temp_info.guest_id
         
-        # TO DO Customer submmission & return customer_id
-        
         # Handle the free class by skip ECPAY
         if class_info['option_price'] <= 0:
-            url = public_url + '/payment/free/'
-            params = {
-                'guest_id': guest_id,
-                'schedule_id': schedule_id,
-                'temp_id': temp_id,
-                'learners': learners,
-            }
-            requests.post(url, json=params)
+            trans = Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners)
+        if trans == '006':
+            return APIHandler.catch('Schedule not exist', code='006')
+        elif trans == '013':
+            return APIHandler.catch('Learner dob format not legible', code='013')
+        elif trans == '014':
+            print ('trans', trans)
             return APIHandler.catch('Success, free class, go to transactions', code='010')
+        else:
+            return APIHandler.catch('Free transaction problem', code='017')
 
         # Start to ECpay and redirect to payment html 
         # html = ECPAY(schedule_id, learners, guest_id, temp_id)
@@ -184,33 +178,34 @@ class ECPAY_ReturnData(APIView):
             print ('trans', trans)
             return APIHandler.catch('ok', code='014')
 
-class ECPAY_ReturnData_Free(APIView):
-    def post(self, request):
-        data = request.data
+# class ECPAY_ReturnData_Free(APIView):
+#     def post(self, request):
+#         data = request.data
 
-        # Get payment informations
-        credict_return_data = {'CustomField2':str({'g_id':data['guest_id']}), 'CustomField3':str({'t_id':data['temp_id']}), 'MerchantTradeNo':''}
-        schedule_id = data['schedule_id']
-        learners = data['learners']
-        # Get all needed class info by schedule_id
-        class_info = GetClassInfo(schedule_id)
-        print ('class_info', class_info)
+#         # Get payment informations
+#         temp_id = request.data.get('temp_id')
+#         credict_return_data = {'CustomField2':str({'g_id':data['guest_id']}), 'CustomField3':str({'t_id':data['temp_id']}), 'MerchantTradeNo':''}
+#         schedule_id = data['schedule_id']
+#         learners = data['learners']
+#         # Get all needed class info by schedule_id
+#         class_info = GetClassInfo(schedule_id)
+#         print ('class_info', class_info)
 
-        # Lock vacancy and update
-        learner_count = len(learners)
-        lock = Update_Vacancy(schedule_id, learner_count)
-        if not lock:
-            return APIHandler.catch('Vacancy not enough or schedule error', code='012')
+#         # Lock vacancy and update
+#         learner_count = len(learners)
+#         lock = Update_Vacancy(schedule_id, learner_count)
+#         if not lock:
+#             return APIHandler.catch('Vacancy not enough or schedule error', code='012')
         
-        # Start transaction to transactions
-        trans = Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
-        if trans == '006':
-            return APIHandler.catch('Schedule not exist', code='006')
-        elif trans == '013':
-            return APIHandler.catch('Learner dob format not legible', code='013')
-        else:
-            print ('trans', trans)
-            return APIHandler.catch(data, code='014')
+#         # Start transaction to transactions
+#         trans = Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
+#         if trans == '006':
+#             return APIHandler.catch('Schedule not exist', code='006')
+#         elif trans == '013':
+#             return APIHandler.catch('Learner dob format not legible', code='013')
+#         else:
+#             print ('trans', trans)
+#             return APIHandler.catch(data, code='014')
 
 class PayByCounter(APIView):
     def post(self, request):

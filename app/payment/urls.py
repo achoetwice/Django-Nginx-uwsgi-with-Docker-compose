@@ -7,7 +7,6 @@ urlpatterns = [
     path('newebpay_guest_paynow/', views.GuestPaynow.as_view()),
     path('ecpay_return_data/', views.ECPAY_ReturnData.as_view()),
     path('newebpay_return_data/', views.NEWEBPAY_ReturnData.as_view()),
-    path('free/', views.ECPAY_ReturnData_Free.as_view()),
     path('pay_by_counter/', views.PayByCounter.as_view()),
     path('close_page/', views.ClosePage.as_view()),
     # path('show_result/', views.Result.as_view()),
