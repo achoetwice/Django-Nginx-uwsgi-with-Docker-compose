@@ -86,15 +86,15 @@ class GuestPaynow(APIView):
         # Handle the free class by skip ECPAY
         if class_info['option_price'] <= 0:
             trans = Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners)
-        if trans == '006':
-            return APIHandler.catch('Schedule not exist', code='006')
-        elif trans == '013':
-            return APIHandler.catch('Learner dob format not legible', code='013')
-        elif trans == '014':
-            print ('trans', trans)
-            return APIHandler.catch('Success, free class, go to transactions', code='010')
-        else:
-            return APIHandler.catch('Free transaction problem', code='017')
+            if trans == '006':
+                return APIHandler.catch('Schedule not exist', code='006')
+            elif trans == '013':
+                return APIHandler.catch('Learner dob format not legible', code='013')
+            elif trans == '014':
+                print ('trans', trans)
+                return APIHandler.catch('Success, free class, go to transactions', code='010')
+            else:
+                return APIHandler.catch('Free transaction problem', code='017')
 
         # Start to ECpay and redirect to payment html 
         # html = ECPAY(schedule_id, learners, guest_id, temp_id)
