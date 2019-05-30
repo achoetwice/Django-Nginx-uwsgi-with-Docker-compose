@@ -1,5 +1,5 @@
 from .models import ClassSchedules, ClassOptions, ClassBranches, VendorClasses, VendorInfos, Transaction, GuestInfos, \
-CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo
+CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo, TransactionCounterPay
 from payment.serializers import *
 from helper.helper import APIHandler
 from datetime import datetime, date
@@ -643,9 +643,11 @@ def Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners):
         return '017'
 
 @transaction.atomic
-def Upate_Counter_Transaction(temp_id):
+def Update_Counter_Transaction(temp_id):
     # Get temp info and store like transaction item
     temp_info = GetGuestTempInfo(temp_id)
+    if not temp_info:
+        return '004'
     schedule_id = temp_info.schedule_id
     learners = eval(temp_info.learners)
     class_info = GetClassInfo(schedule_id)
@@ -662,7 +664,7 @@ def Upate_Counter_Transaction(temp_id):
     sub_total = learners_count * class_info['option_price']
 
     # Update transaction
-    new_transaction = CounterTransaction()
+    counter_transaction = TransactionCounterPay()
     data = {}
     data['guest_id'] = temp_info.guest_id
     data['price_prefix'] = class_info['price_prefix']
@@ -678,53 +680,20 @@ def Upate_Counter_Transaction(temp_id):
     data['option_name'] = class_info['option_name']
     data['schedule_name'] = class_info['schedule_name']
     data['vendor_name'] = class_info['vendor_name']
-
-    # print ('data', data)
-    for key,value in data.items():
-        setattr(new_transaction, key, value)
-    new_transaction.save()
-    # print ('uuid', str(uuid.uuid4()))
+    print ('branch_name', class_info['branch_name'])
     data['branch_name'] = class_info['branch_name']
     data['learner_count'] = learners_count
     data['class_date'] = class_info['schedule_name']
     data['class_time'] = schedule.start_time + '-' + schedule.end_time
-    data['redeem'] = 0
-    data['confirm'] = 0
-    data['price_prefix'] = class_info['price_prefix']
-    # item_data['special_name'] = ''
-    # item_data['special_discount'] = ''
-    for key,value in item_data.items():
-        setattr(new_transaction_item, key, value)
-    new_transaction_item.save()
-
     data['country'] = branch.country
     data['city'] = branch.city
-    data['address'] = branch.address
-
-
-    prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
-    prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
-    if learner.get('profile_dob', None):
-        try:
-            with transaction.atomic():
-                learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y/%m/%d').date()
-                print ('change format 1')
-        except ValueError:
-            learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y-%m-%d').date()
-            print ('change format 2')
-        except:
-            prof_data['profile_dob'] = learner['profile_dob']
-            print ('change format 3')
-            return '013'
-    # print ('learner[profile_dob] after', learner['profile_dob'])
-    prof_data['profile_dob'] = learner['profile_dob']
-    # print ('end of learner dob')
-    prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
+    data['learners'] = learners
+    
     print ('end of learner note')
-    for key,value in prof_data.items():
-        print ('key, value', key, ',', value)
-        setattr(new_transactionitem_profile, key, value)
-    new_transactionitem_profile.save()
+
+    for key,value in data.items():
+        setattr(counter_transaction, key, value)
+    counter_transaction.save()
     
     # Delete temporary guest info
     temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
@@ -733,7 +702,7 @@ def Upate_Counter_Transaction(temp_id):
     # Send email if Transaction done
 
     # Wait till Joe complete
-    return '014'
+    return '016'
 
 def GetHistroyLearners(email):
     # Use email to filter history

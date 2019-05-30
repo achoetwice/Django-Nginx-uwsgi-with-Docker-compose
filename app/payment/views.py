@@ -178,40 +178,16 @@ class ECPAY_ReturnData(APIView):
             print ('trans', trans)
             return APIHandler.catch('ok', code='014')
 
-# class ECPAY_ReturnData_Free(APIView):
-#     def post(self, request):
-#         data = request.data
-
-#         # Get payment informations
-#         temp_id = request.data.get('temp_id')
-#         credict_return_data = {'CustomField2':str({'g_id':data['guest_id']}), 'CustomField3':str({'t_id':data['temp_id']}), 'MerchantTradeNo':''}
-#         schedule_id = data['schedule_id']
-#         learners = data['learners']
-#         # Get all needed class info by schedule_id
-#         class_info = GetClassInfo(schedule_id)
-#         print ('class_info', class_info)
-
-#         # Lock vacancy and update
-#         learner_count = len(learners)
-#         lock = Update_Vacancy(schedule_id, learner_count)
-#         if not lock:
-#             return APIHandler.catch('Vacancy not enough or schedule error', code='012')
-        
-#         # Start transaction to transactions
-#         trans = Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
-#         if trans == '006':
-#             return APIHandler.catch('Schedule not exist', code='006')
-#         elif trans == '013':
-#             return APIHandler.catch('Learner dob format not legible', code='013')
-#         else:
-#             print ('trans', trans)
-#             return APIHandler.catch(data, code='014')
-
 class PayByCounter(APIView):
     def post(self, request):
         temp_id = request.data.get('temp_id')
-        counter_rsult = Update_CounterTransaction
-        return APIHandler.catch('Counter transaction saved', code='016')
+        counter_result = Update_Counter_Transaction(temp_id)
+        if counter_result == '016':
+            return APIHandler.catch('Counter transaction saved', code='016')
+        elif counter_result == '004':
+            return APIHandler.catch('Missing temp info', code='004')
+        else:
+            return APIHandler.catch('ERRRRRRRRRRRRRR', code='999')
 
 class ClosePage(APIView):
     def get(self, request):

@@ -1375,6 +1375,38 @@ class TransactionItems(models.Model):
         managed = False
         db_table = 'transaction_items'
 
+class TransactionCounterPay(models.Model):
+    guest_id = models.CharField(max_length=255)
+    price_prefix = models.CharField(max_length=255)
+    total_price = models.DecimalField(max_digits=15, decimal_places=2)
+    # To add device_type from platform or not, it's a question
+    # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS', 6:'Counter'}
+    device_type = models.IntegerField(default=0)
+    booking_class_id = models.CharField(max_length=255)
+    booking_schedule_id = models.CharField(max_length=255)
+    vendor_id = models.CharField(max_length=255)
+    vendor_branch_id = models.CharField(max_length=255)
+    class_name = models.CharField(max_length=255)
+    option_name = models.CharField(max_length=255)
+    schedule_name = models.CharField(max_length=255)
+    vendor_name = models.CharField(max_length=255)
+    branch_name = models.CharField(max_length=255)
+    learner_count = models.IntegerField()
+    class_date = models.CharField(max_length=255, blank=True, null=True)
+    class_time = models.CharField(max_length=255, blank=True, null=True)
+    country = models.CharField(max_length=255)
+    city = models.CharField(max_length=255)
+    learners = models.CharField(max_length=255)
+    date_added = models.DateTimeField()
+
+    def save(self, *args, **kwargs):
+        self.date_added = timezone.now()
+        super(TransactionCounterPay, self).save(*args, **kwargs)
+
+    class Meta:
+        managed = True
+        db_table = 'transaction_counterpay'
+
 
 class Users(models.Model):
     # pk = models.CharField(max_length=40, blank=True, null=True)
