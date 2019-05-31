@@ -189,6 +189,73 @@ class PayByCounter(APIView):
         else:
             return APIHandler.catch('ERRRRRRRRRRRRRR', code='999')
 
+class PayByMail(APIView):
+    def get(self, request):
+        temp_id = request.data.get('temp_id')
+        # Call email api
+        # if mail sent
+        return APIHandler.catch('Sending mail success', code='999')
+
+class MailGuestPaynow(APIView):
+    def get(self, request, temp_id):
+        temp_id = temp_id
+        if not temp_id:
+            return APIHandler.catch('Please provide temp_id', code='003')
+        temp_info = GetGuestTempInfo(temp_id)
+        if not temp_info:
+            return APIHandler.catch('Missing temp info', code='004')
+        email = temp_info.email
+        first_name = temp_info.first_name
+        last_name = temp_info.last_name
+        customer_mobile = temp_info.mobile
+        learners = eval(temp_info.learners)
+        schedule_id = temp_info.schedule_id
+        # ECPAY_token = request.data.get('ECPAY_token')
+        # coupon = request.data.get('coupon')
+        auto_create_account = temp_info.auto_create_account
+        if not email or not first_name or not last_name or not customer_mobile:
+            return APIHandler.catch('Temp info not complete', code='005')
+
+        # Get all needed class info by schedule_id
+        class_info = GetClassInfo(schedule_id)
+        if not class_info:
+            return APIHandler.catch('Schedule not exist', code='006')
+        # Confirm that learners and vacancy
+        learner_count = len(learners)
+        if not learners:
+            return APIHandler.catch('Missing learner info', code='007')
+        elif learner_count > class_info['vacancy']:
+            return APIHandler.catch('No vacancy', code='008')
+
+        # # # Confirm age is valid
+
+        guest_id = temp_info.guest_id
+        
+        # Handle the free class by skip ECPAY
+        if class_info['option_price'] <= 0:
+            trans = Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners)
+            if trans == '006':
+                return APIHandler.catch('Schedule not exist', code='006')
+            elif trans == '013':
+                return APIHandler.catch('Learner dob format not legible', code='013')
+            elif trans == '014':
+                print ('trans', trans)
+                return APIHandler.catch('Success, free class, go to transactions', code='010')
+            else:
+                return APIHandler.catch('Free transaction problem', code='017')
+
+        # Start to ECpay and redirect to payment html 
+        # html = ECPAY(schedule_id, learners, guest_id, temp_id)
+        pay_data = NEWEBPAY(schedule_id, learners, guest_id, temp_id)
+        # print (html)
+        # if html:
+        #     return render(request, 'ECPAY_pay.html', {'html':html})
+        if pay_data:
+            return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
+        else:
+            return APIHandler.catch('Fail to generate payment page', code='011')
+        return APIHandler.catch('Sending mail success', code='999')
+
 class ClosePage(APIView):
     def get(self, request):
         return render(request, 'close_page.html')

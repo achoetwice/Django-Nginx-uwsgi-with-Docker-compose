@@ -612,7 +612,22 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
     # Delete temporary guest info
     temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
     temp_guest.delete()
-    # Send email if Transaction done
+
+    # Send email to both customer and partner if Transaction done
+    mail_data = {
+        "guest_email": temp_info.email,
+        "partner_email": vendor.vendor_email,
+        "class_hold_by": class_info['vendor_name'],
+        "branch": class_info['branch_name'],
+        "learners": learners,
+        "class_name": class_info['class_name'],
+        "class_option": class_info['option_name'],
+        "class_date" : class_info['schedule_name'],
+        "class_time" : schedule.start_time + '-' + schedule.end_time,
+        "price": sub_total
+    }
+    print ('mail_data', mail_data)
+    # customer_mail = requests.post(public_url+'放這裡',data=mail_data)
 
     # Wait till Joe complete
     return '014'
