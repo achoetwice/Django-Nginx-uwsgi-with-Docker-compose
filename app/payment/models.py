@@ -315,7 +315,7 @@ class ClassSchedules(models.Model):
     id = models.CharField(primary_key=True, unique=True, max_length=40, db_column='pk')
     created_at = models.DateTimeField(blank=True, null=True)
     updated_at = models.DateTimeField(blank=True, null=True)
-    option = models.ForeignKey('ClassOptions', related_name='class_schedules', to_field='id', on_delete=models.DO_NOTHING, db_constraint=False)
+    option = models.ForeignKey('ClassOptions', related_name='class_schedules', to_field='id', on_delete=models.DO_NOTHING, db_constraint=False, null=True, db_column='option_id')
     schedule_name = models.CharField(max_length=255)
     next_term_id = models.CharField(max_length=80, blank=True, null=True)
     start_date = models.DateTimeField(blank=True, null=True)
@@ -328,7 +328,7 @@ class ClassSchedules(models.Model):
     
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'class_schedules'
 
 
@@ -368,6 +368,28 @@ class CommentHistories(models.Model):
     class Meta:
         managed = False
         db_table = 'comment_histories'
+
+class CoreBauser(models.Model):
+    password = models.CharField(max_length=128)
+    last_login = models.DateTimeField(blank=True, null=True)
+    is_superuser = models.IntegerField()
+    username = models.CharField(unique=True, max_length=150)
+    first_name = models.CharField(max_length=30)
+    last_name = models.CharField(max_length=30)
+    email = models.CharField(max_length=254)
+    is_staff = models.IntegerField()
+    is_active = models.IntegerField()
+    date_joined = models.DateTimeField()
+    eda_role = models.CharField(max_length=512, blank=True, null=True)
+    lej_api_token = models.CharField(max_length=2048, blank=True, null=True)
+    reverse_token = models.CharField(max_length=2048, blank=True, null=True)
+    password_raw = models.CharField(max_length=255, blank=True, null=True)
+    tb_api_token = models.CharField(max_length=2048, blank=True, null=True)
+    ms_api_token = models.CharField(max_length=2048, blank=True, null=True)
+
+    class Meta:
+        managed = False
+        db_table = 'core_bauser'
 
 
 class CountryHolidays(models.Model):
@@ -1263,13 +1285,15 @@ class Transaction(models.Model):
     newebpay_merchant_trade_no = models.CharField(max_length=255, blank=True, null=True)
     device_type = models.IntegerField()
     message_id = models.CharField(max_length=100, blank=True, null=True)
+    other_amount = models.FloatField(default=0)
+    # temp = models.FloatField(default=0)
 
     def save(self, *args, **kwargs):
         self.date_added = timezone.now()
         super(Transaction, self).save(*args, **kwargs)
         
     class Meta:
-        managed = True
+        managed = False
         db_table = 'transaction'
 
 
@@ -1527,7 +1551,7 @@ class VendorClasses(models.Model):
     updated_at = models.DateTimeField(blank=True, null=True)
     class_name = models.CharField(max_length=255, blank=True, null=True)
     slug_name = models.CharField(max_length=255, blank=True, null=True)
-    vendor = models.ForeignKey('VendorInfos', related_name='vendor_classes', to_field='id', on_delete=models.DO_NOTHING, db_constraint=False)
+    vendor = models.ForeignKey('VendorInfos', related_name='vendor_classes', to_field='id', on_delete=models.DO_NOTHING, db_constraint=False, null=True, db_column='vendor_id')
     description = models.TextField(blank=True, null=True)
     age_min = models.IntegerField(blank=True, null=True)
     age_max = models.IntegerField(blank=True, null=True)
@@ -1557,7 +1581,7 @@ class VendorClasses(models.Model):
     available_status = models.IntegerField(blank=True, null=True)
 
     class Meta:
-        managed = True
+        managed = False
         db_table = 'vendor_classes'
 
 

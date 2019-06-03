@@ -19,6 +19,7 @@ from .services import *
 #         return render(request, 'rest_framework/api.html')
 
 public_url = os.getenv('public_url')
+public_url_sendmail = os.getenv('public_url_sendmail')
 
 class StoreGuestTempInfo(APIView):
     def post(self, request):
@@ -93,6 +94,8 @@ class GuestPaynow(APIView):
             elif trans == '014':
                 print ('trans', trans)
                 return APIHandler.catch('Success, free class, go to transactions', code='010')
+            elif trans == '020':
+                return APIHandler.catch('Sending mail failed', code='020')
             else:
                 return APIHandler.catch('Free transaction problem', code='017')
 
@@ -140,6 +143,7 @@ class NEWEBPAY_ReturnData(APIView):
             return APIHandler.catch('Schedule not exist', code='006')
         elif trans == '013':
             return APIHandler.catch('Learner dob format not legible', code='013')
+        
         else:
             print ('trans', trans)
             return APIHandler.catch('ok', code='014')
@@ -174,6 +178,8 @@ class ECPAY_ReturnData(APIView):
             return APIHandler.catch('Schedule not exist', code='006')
         elif trans == '013':
             return APIHandler.catch('Learner dob format not legible', code='013')
+        elif trans == '020':
+            return APIHandler.catch('Sending mail failed', code='020')
         else:
             print ('trans', trans)
             return APIHandler.catch('ok', code='014')
@@ -186,15 +192,31 @@ class PayByCounter(APIView):
             return APIHandler.catch('Counter transaction saved', code='016')
         elif counter_result == '004':
             return APIHandler.catch('Missing temp info', code='004')
+        elif counter_result == '020':
+            return APIHandler.catch('Sending mail failed', code='020')
         else:
-            return APIHandler.catch('ERRRRRRRRRRRRRR', code='999')
+            return APIHandler.catch('not specified', code='999')
 
 class PayByMail(APIView):
     def get(self, request):
-        temp_id = request.data.get('temp_id')
+        temp_id = request.GET.get('temp_id')
+        guest_email = request.GET.get('guest_email')
+        payment_url = public_url + '/payment/mail_guest_pay/' + temp_id + '/'
+        data = {
+            'guest_email': guest_email,
+            'payment_url': payment_url
+        }
+        if not temp_id or not guest_email:
+            return APIHandler.catch('Lack of mail information', code='018')
+        url = public_url_sendmail + '/sendmail/payment/'
+        send_mail = requests.post(url, json=data)
         # Call email api
         # if mail sent
-        return APIHandler.catch('Sending mail success', code='999')
+        if send_mail == 'success':
+            return APIHandler.catch('Sending mail success', code='019')
+        else:
+            print (send_mail)
+            return APIHandler.catch('Sending mail failed', code='020')
 
 class MailGuestPaynow(APIView):
     def get(self, request, temp_id):

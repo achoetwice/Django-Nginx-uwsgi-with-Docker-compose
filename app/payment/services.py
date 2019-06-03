@@ -4,6 +4,7 @@ from payment.serializers import *
 from helper.helper import APIHandler
 from datetime import datetime, date
 import importlib.util
+from copy import deepcopy
 import pytz, json, os, uuid, time, pprint
 from decimal import Decimal
 from django.core.exceptions import ObjectDoesNotExist
@@ -13,6 +14,7 @@ from .gateway_service import *
 import requests
 
 public_url = os.getenv('public_url')
+public_url_sendmail = os.getenv('public_url_sendmail')
 
 def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id):
     New_temp_info = GuestTemporaryInfo.objects.create(id =str(uuid.uuid4())[0:8], email = email, first_name = first_name, last_name = last_name, mobile = customer_mobile, \
@@ -578,8 +580,11 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
         setattr(new_branch_history, key, value)
     new_branch_history.save()
 
+    temp_learners = deepcopy(learners)
+    print ('WTDDDDDDDDDDDDDDD', temp_learners)
+    
     # Update transactionItemProfile
-    for learner in learners:
+    for learner in temp_learners:
         prof_data = {}
         new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
         # print ('new_transactionitem_profile', new_transactionitem_profile)
@@ -614,6 +619,7 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
     temp_guest.delete()
 
     # Send email to both customer and partner if Transaction done
+    print ('str_learners', temp_learners)
     mail_data = {
         "guest_email": temp_info.email,
         "partner_email": vendor.vendor_email,
@@ -624,10 +630,17 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
         "class_option": class_info['option_name'],
         "class_date" : class_info['schedule_name'],
         "class_time" : schedule.start_time + '-' + schedule.end_time,
-        "price": sub_total
+        "price": str(sub_total)
     }
     print ('mail_data', mail_data)
-    # customer_mail = requests.post(public_url+'放這裡',data=mail_data)
+    customer_service = public_url_sendmail+'/sendmail/guest/'
+    partner_service = public_url_sendmail+'/sendmail/partner/'
+    customer_mail_send = requests.post(customer_service,json=mail_data)
+    partner_mail_send = requests.post(partner_service,json=mail_data)
+
+    if not customer_mail_send == 'success' or not partner_mail_send=='success':
+        print ('customer_mail_send', customer_mail_send, 'partner_mail_send', partner_mail_send)
+        return '020'
 
     # Wait till Joe complete
     return '014'
@@ -654,6 +667,8 @@ def Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners):
         return '013'
     elif trans == '014':
         return '014'
+    elif trans == '020':
+        return '020'
     else:
         return '017'
 
@@ -664,6 +679,7 @@ def Update_Counter_Transaction(temp_id):
     if not temp_info:
         return '004'
     schedule_id = temp_info.schedule_id
+    str_learners = temp_info.learners
     learners = eval(temp_info.learners)
     class_info = GetClassInfo(schedule_id)
     learners_count = len(learners)
@@ -715,8 +731,28 @@ def Update_Counter_Transaction(temp_id):
     temp_guest.delete()
     
     # Send email if Transaction done
+    # Send email to both customer and partner if Transaction done
+    mail_data = {
+        "guest_email": temp_info.email,
+        "partner_email": vendor.vendor_email,
+        "class_hold_by": class_info['vendor_name'],
+        "branch": class_info['branch_name'],
+        "learners": str_learners,
+        "class_name": class_info['class_name'],
+        "class_option": class_info['option_name'],
+        "class_date" : class_info['schedule_name'],
+        "class_time" : schedule.start_time + '-' + schedule.end_time,
+        "price": str(sub_total)
+    }
+    print ('mail_data', mail_data)
+    customer_service = public_url_sendmail+'/mail/sendmail/guest/'
+    partner_service = public_url_sendmail+'/mail/sendmail/partner/'
+    customer_mail_send = requests.post(customer_service,json=mail_data)
+    partner_mail_send = requests.post(partner_service,json=mail_data)
+    if not customer_mail_send == 'success' or not partner_mail_send=='success':
+        print ('mail_send error ', customer_mail_send, partner_mail_send)
+        return '020'
 
-    # Wait till Joe complete
     return '016'
 
 def GetHistroyLearners(email):
