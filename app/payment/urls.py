@@ -10,7 +10,7 @@ urlpatterns = [
     path('newebpay_return_data/', views.NEWEBPAY_ReturnData.as_view()),
     path('pay_by_counter/', views.PayByCounter.as_view()),
     path('pay_by_mail/', views.PayByMail.as_view()),
-    url(r'^mail_guest_pay/(?P<temp_id>[\w\x2D]+)/$', views.MailGuestPaynow.as_view()),
+    url(r'^url_guest_pay/(?P<temp_id>[\w\x2D]+)/$', views.MailGuestPaynow.as_view()),
     path('close_page/', views.ClosePage.as_view()),
     # path('show_result/', views.Result.as_view()),
     path('history_learners/', views.HistoryLearners.as_view()),

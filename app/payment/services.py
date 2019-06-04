@@ -137,7 +137,7 @@ def NEWEBPAY(schedule_id, learners, guest_id, temp_id):
     MerchantID = 'MS36244907'
     key = os.getenv('NEWEBPAY_KEY')
     iv = os.getenv('NEWEBPAY_IV')
-    print (f'{int(time.time())}')
+
     order_params = {
         'MerchantID': MerchantID,
         'RespondType': 'JSON',
@@ -201,7 +201,6 @@ def ECPAY(schedule_id, learners, guest_id, temp_id):
     schedule_id = schedule_id
     learners = learners
     class_info = GetClassInfo(schedule_id)
-    print ('option_price', class_info['option_price'])
     #  Use int only because it's TWD
     sub_total = int(class_info['option_price'] * len(learners))
     item_name = class_info['option_name']
@@ -421,7 +420,7 @@ def GetNewTransItemNo(last_trans_no):
 
 
 @transaction.atomic
-def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data=[]):
+def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data=[]):
     # credict_return_data = {'ATMAccBank': '', 'ATMAccNo': '',  'AlipayID': '', 'AlipayTradeNo': '', 'CustomField1': {'schedule_id': 'zpeexbynq0lazeymm4rs'}, 'CustomField2':{'guest_id': 'feb81dd2-8824-41d3-81b6-31f0b8a16e8c'}, 'CustomField3': '', 'CustomField4': '', 'ExecTimes': '', \
     #     'Frequency': '', 'HandlingCharge': '55', 'ItemName': [{'profile_name': 'Candy Yo', 'profile_dob': '2016/3/28', 'profile_note': ''}, {'profile_name': 'Andrew Yo', \
     #     'profile_dob': '2016/5/28', 'profile_note': 'cc'}],'MerchantID': '2000214', 'MerchantTradeNo': 'NO20190508043305', 'PayFrom': '', 'PaymentDate': '2019/05/08 12:33:27', \
@@ -483,7 +482,7 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
     new_transaction.save()
     # print ('uuid', str(uuid.uuid4()))
 
-    # Upate_Transaction_item
+    # Update_Transaction_item
     new_transaction_item = TransactionItems()
     item_data = {}
     # Update transaction no in item
@@ -581,7 +580,7 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
     new_branch_history.save()
 
     temp_learners = deepcopy(learners)
-    print ('WTDDDDDDDDDDDDDDD', temp_learners)
+    # print ('WTDDDDDDDDDDDDDDD', temp_learners)
     
     # Update transactionItemProfile
     for learner in temp_learners:
@@ -632,26 +631,26 @@ def Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return
         "class_time" : schedule.start_time + '-' + schedule.end_time,
         "price": str(sub_total)
     }
-    print ('mail_data', mail_data)
+    # print ('mail_data', mail_data)
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
     partner_mail_send = requests.post(partner_service,json=mail_data)
-
-    if not customer_mail_send == 'success' or not partner_mail_send=='success':
-        print ('customer_mail_send', customer_mail_send, 'partner_mail_send', partner_mail_send)
-        return '020'
-
-    # Wait till Joe complete
-    return '014'
+    customer_mail_send = eval(customer_mail_send.content)
+    partner_mail_send = eval(partner_mail_send.content)
+    if not customer_mail_send['code'] == '005000':
+        return customer_mail_send
+    elif not partner_mail_send['code'] == '005000':
+        return partner_mail_send
+    else:
+        return '014'
 
 @transaction.atomic
-def Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners):
+def Update_Free_Transaction(temp_id, guest_id, schedule_id, learners):
     # Get payment informations
     credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
     # Get all needed class info by schedule_id
     class_info = GetClassInfo(schedule_id)
-    print ('class_info', class_info)
 
     # Lock vacancy and update
     learner_count = len(learners)
@@ -660,7 +659,7 @@ def Upate_Free_Transaction(temp_id, guest_id, schedule_id, learners):
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
     
     # Start transaction to transactions
-    trans = Upate_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
+    trans = Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
     if trans == '006':
         return '006'
     elif trans == '013':
@@ -679,7 +678,8 @@ def Update_Counter_Transaction(temp_id):
     if not temp_info:
         return '004'
     schedule_id = temp_info.schedule_id
-    str_learners = temp_info.learners
+    str_learners = deepcopy(temp_info.learners)
+    # print ('str_learners', str_learners)
     learners = eval(temp_info.learners)
     class_info = GetClassInfo(schedule_id)
     learners_count = len(learners)
@@ -711,7 +711,6 @@ def Update_Counter_Transaction(temp_id):
     data['option_name'] = class_info['option_name']
     data['schedule_name'] = class_info['schedule_name']
     data['vendor_name'] = class_info['vendor_name']
-    print ('branch_name', class_info['branch_name'])
     data['branch_name'] = class_info['branch_name']
     data['learner_count'] = learners_count
     data['class_date'] = class_info['schedule_name']
@@ -719,8 +718,7 @@ def Update_Counter_Transaction(temp_id):
     data['country'] = branch.country
     data['city'] = branch.city
     data['learners'] = learners
-    
-    print ('end of learner note')
+
 
     for key,value in data.items():
         setattr(counter_transaction, key, value)
@@ -744,23 +742,26 @@ def Update_Counter_Transaction(temp_id):
         "class_time" : schedule.start_time + '-' + schedule.end_time,
         "price": str(sub_total)
     }
-    print ('mail_data', mail_data)
-    customer_service = public_url_sendmail+'/mail/sendmail/guest/'
-    partner_service = public_url_sendmail+'/mail/sendmail/partner/'
+    # print ('mail data', mail_data)
+    customer_service = public_url_sendmail+'/sendmail/guest/'
+    partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
     partner_mail_send = requests.post(partner_service,json=mail_data)
-    if not customer_mail_send == 'success' or not partner_mail_send=='success':
-        print ('mail_send error ', customer_mail_send, partner_mail_send)
-        return '020'
-
-    return '016'
+    # print ('customer_mail_send', customer_mail_send)
+    customer_mail_send = eval(customer_mail_send.content)
+    partner_mail_send = eval(partner_mail_send.content)
+    # print ('customer_mail_send2', customer_mail_send)
+    if not customer_mail_send['code'] == '005000':
+        return customer_mail_send
+    elif not partner_mail_send['code'] == '005000':
+        return partner_mail_send
+    else:
+        return '016'
 
 def GetHistroyLearners(email):
     # Use email to filter history
     guest_infos = GuestInfos.objects.filter(email = email)
-    # print ('guest_infos', guest_infos)
     transactions = Transaction.objects.filter(guest_id__in = [guest.id for guest in guest_infos])
-    # print ('transactions', transactions)
     transaction_items = TransactionItems.objects.filter(transaction_id__in = [transaction.id for transaction in transactions])
     transaction_item_profile = TransactionItemProfiles.objects.filter(transaction_item_id__in = [transaction_item.id for transaction_item in transaction_items])
     #  Use name to further filter history
