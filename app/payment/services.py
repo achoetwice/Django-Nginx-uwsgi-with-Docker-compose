@@ -359,6 +359,16 @@ def Update_Vacancy(schedule_id, learner_count):
         return True
 
 def GetNewTransNo(last_trans_no):
+    if not last_trans_no:
+        today_y = int(str(date.today().year)[2:4])
+        today_m = date.today().month
+        new_y = today_y
+        new_m = today_m
+        new_m = str(new_m).zfill(2)
+        new_n = 1
+        new_n = str(new_n).zfill(6)
+        new_no = str(new_y) + new_m + new_n
+        return new_no
     last_trans_y = int(last_trans_no[0:2])
     last_trans_m = int(last_trans_no[2:4])
     last_trans_n = int(last_trans_no[4:11])
@@ -460,7 +470,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     last_trans = Transaction.objects.latest('transaction_no')
     print ('latest transactions, ', last_trans)
     last_trans_no = last_trans.transaction_no
-    data['transaction_no'] = GetNewTransNo(last_trans_no)
+    new_transaction_number = GetNewTransNo(last_trans_no)
+    data['transaction_no'] = new_transaction_number
     data['ecredits_price'] = 0
     data['guest_id'] = temp_info.guest_id
     data['price_prefix'] = class_info['price_prefix']
@@ -613,12 +624,11 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
             setattr(new_transactionitem_profile, key, value)
         new_transactionitem_profile.save()
     
-    # Delete temporary guest info
+    # Get temporary guest info, send mail, then delete
     temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
-    temp_guest.delete()
+    
 
     # Send email to both customer and partner if Transaction done
-    print ('str_learners', temp_learners)
     mail_data = {
         "guest_email": temp_info.email,
         "partner_email": vendor.vendor_email,
@@ -629,13 +639,21 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         "class_option": class_info['option_name'],
         "class_date" : class_info['schedule_name'],
         "class_time" : schedule.start_time + '-' + schedule.end_time,
-        "price": str(sub_total)
+        "price": str(sub_total),
+        "payment_type": 'Credit',
+        "customer_name": temp_guest.last_name + temp_guest.first_name,
+        "customer_mobile": temp_guest.mobile,
+        "transaction_number": new_transaction_number
     }
     # print ('mail_data', mail_data)
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
+    print ('customer_mail_send', customer_mail_send)
     partner_mail_send = requests.post(partner_service,json=mail_data)
+    if customer_mail_send.status_code != 200 or partner_mail_send.status_code != 200:
+        print ('customer_mail_send.status_code', customer_mail_send.status_code)
+        return '020'
     customer_mail_send = eval(customer_mail_send.content)
     partner_mail_send = eval(partner_mail_send.content)
     if not customer_mail_send['code'] == '005000':
@@ -643,12 +661,13 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     elif not partner_mail_send['code'] == '005000':
         return partner_mail_send
     else:
+        temp_guest.delete()
         return '014'
 
 @transaction.atomic
 def Update_Free_Transaction(temp_id, guest_id, schedule_id, learners):
     # Get payment informations
-    credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
+    # credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
     # Get all needed class info by schedule_id
     class_info = GetClassInfo(schedule_id)
 
@@ -659,7 +678,7 @@ def Update_Free_Transaction(temp_id, guest_id, schedule_id, learners):
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
     
     # Start transaction to transactions
-    trans = Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
+    trans = Update_Transaction(temp_id, schedule_id, learners, class_info)
     if trans == '006':
         return '006'
     elif trans == '013':
@@ -678,8 +697,8 @@ def Update_Counter_Transaction(temp_id):
     if not temp_info:
         return '004'
     schedule_id = temp_info.schedule_id
-    str_learners = deepcopy(temp_info.learners)
-    # print ('str_learners', str_learners)
+    temp_learners = eval(deepcopy(temp_info.learners))
+    # print ('temp_learners', temp_learners)
     learners = eval(temp_info.learners)
     class_info = GetClassInfo(schedule_id)
     learners_count = len(learners)
@@ -697,6 +716,13 @@ def Update_Counter_Transaction(temp_id):
     # Update transaction
     counter_transaction = TransactionCounterPay()
     data = {}
+
+    last_trans = TransactionCounterPay.objects.latest('counter_transaction_no')
+    print ('latest transactions, ', last_trans)
+    last_trans_no = last_trans.counter_transaction_no
+    print ('GetNewTransNo(last_trans_no)', GetNewTransNo(last_trans_no))
+    new_transaction_number = GetNewTransNo(last_trans_no)
+    data['counter_transaction_no'] = new_transaction_number
     data['guest_id'] = temp_info.guest_id
     data['price_prefix'] = class_info['price_prefix']
     data['total_price'] = sub_total
@@ -724,9 +750,8 @@ def Update_Counter_Transaction(temp_id):
         setattr(counter_transaction, key, value)
     counter_transaction.save()
     
-    # Delete temporary guest info
+    # Get temporary guest info, send mail, then delete
     temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
-    temp_guest.delete()
     
     # Send email if Transaction done
     # Send email to both customer and partner if Transaction done
@@ -735,19 +760,25 @@ def Update_Counter_Transaction(temp_id):
         "partner_email": vendor.vendor_email,
         "class_hold_by": class_info['vendor_name'],
         "branch": class_info['branch_name'],
-        "learners": str_learners,
+        "learners": temp_learners,
         "class_name": class_info['class_name'],
         "class_option": class_info['option_name'],
         "class_date" : class_info['schedule_name'],
         "class_time" : schedule.start_time + '-' + schedule.end_time,
-        "price": str(sub_total)
+        "price": str(sub_total),
+        "payment_type": 'Cash',
+        "customer_name": temp_guest.last_name + temp_guest.first_name,
+        "customer_mobile": temp_guest.mobile,
+        "transaction_number": new_transaction_number
     }
-    # print ('mail data', mail_data)
+    print ('mail data', mail_data)
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
     partner_mail_send = requests.post(partner_service,json=mail_data)
     # print ('customer_mail_send', customer_mail_send)
+    if customer_mail_send.status_code != 200 or partner_mail_send.status_code != 200:
+        return '020'
     customer_mail_send = eval(customer_mail_send.content)
     partner_mail_send = eval(partner_mail_send.content)
     # print ('customer_mail_send2', customer_mail_send)
@@ -756,6 +787,7 @@ def Update_Counter_Transaction(temp_id):
     elif not partner_mail_send['code'] == '005000':
         return partner_mail_send
     else:
+        temp_guest.delete()
         return '016'
 
 def GetHistroyLearners(email):

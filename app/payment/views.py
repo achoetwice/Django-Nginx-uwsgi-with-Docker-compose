@@ -201,10 +201,17 @@ class PayByMail(APIView):
     def get(self, request):
         temp_id = request.GET.get('temp_id')
         guest_email = request.GET.get('guest_email')
+
+        schedule_id = GetGuestTempInfo(temp_id).schedule_id
+        class_info = GetClassInfo(schedule_id)
         payment_url = public_url + '/payment/url_guest_pay/' + temp_id + '/'
         data = {
-            'guest_email': guest_email,
-            'payment_url': payment_url
+            "guest_email": guest_email,
+            "payment_url": payment_url,
+            "class_name": class_info['class_name'],
+            "class_option": class_info['option_name'],
+            "class_date" : class_info['schedule_name'],
+            "class_time" : class_info['schedule_start_time'] + '-' + class_info['schedule_end_time'],
         }
         if not temp_id or not guest_email:
             return APIHandler.catch('Lack of mail information', code='018')

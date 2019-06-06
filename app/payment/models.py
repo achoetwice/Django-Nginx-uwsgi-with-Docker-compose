@@ -1401,6 +1401,7 @@ class TransactionItems(models.Model):
 
 class TransactionCounterPay(models.Model):
     guest_id = models.CharField(max_length=255)
+    counter_transaction_no = models.CharField(max_length=30, null=True)
     price_prefix = models.CharField(max_length=255)
     total_price = models.DecimalField(max_digits=15, decimal_places=2)
     # To add device_type from platform or not, it's a question
