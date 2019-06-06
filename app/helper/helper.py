@@ -14,7 +14,7 @@ class APIHandler:
     
     @staticmethod
     def catch(data, code):
-        return Response({'code': '003'+code, 'data': data})
+        return Response({'code': 'S003'+code, 'data': data})
 
     @staticmethod
     def fail(msg, code=99):

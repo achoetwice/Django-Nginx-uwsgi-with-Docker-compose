@@ -188,14 +188,13 @@ class PayByCounter(APIView):
     def post(self, request):
         temp_id = request.data.get('temp_id')
         counter_result = Update_Counter_Transaction(temp_id)
-        if counter_result == '016':
-            return APIHandler.catch('Counter transaction saved', code='016')
-        elif counter_result == '004':
+        
+        if counter_result == '004':
             return APIHandler.catch('Missing temp info', code='004')
         elif counter_result == '020':
             return APIHandler.catch('Sending mail failed', code='020')
         else:
-            return counter_result
+            return APIHandler.catch(data={'transaction_no':counter_result}, code='016')
 
 class PayByMail(APIView):
     def get(self, request):
@@ -297,6 +296,15 @@ class HistoryLearners(APIView):
         learners = GetHistroyLearners(email)
 
         return APIHandler.catch(data=learners, code='015')
+
+class GetTransactionNo(APIView):
+    def get(self, request):
+        temp_id = request.GET.get('temp_id')
+        trans_no = GetTransactionNumber(temp_id)
+        if temp_id == '021':
+            return APIHandler.catch('Transaction not found', code='021')
+        else:
+            return APIHandler.catch(data={'transaction_no': trans_no}, code='000')
 
 # class TEST(APIView):
 #     def get(self, request):

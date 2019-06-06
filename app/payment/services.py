@@ -453,7 +453,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     temp_info = GetGuestTempInfo(temp_id)
 
     try:
-        schedule = ClassSchedules.objects.get(pk= schedule_id)
+        with transaction.atomic():
+            schedule = ClassSchedules.objects.get(pk= schedule_id)
     except ObjectDoesNotExist:
         return '006'
     option = schedule.option
@@ -704,7 +705,8 @@ def Update_Counter_Transaction(temp_id):
     learners_count = len(learners)
     
     try:
-        schedule = ClassSchedules.objects.get(pk= schedule_id)
+        with transaction.atomic():
+            schedule = ClassSchedules.objects.get(pk= schedule_id)
     except ObjectDoesNotExist:
         return '006'
     option = schedule.option
@@ -721,7 +723,7 @@ def Update_Counter_Transaction(temp_id):
     print ('latest transactions, ', last_trans)
     last_trans_no = last_trans.counter_transaction_no
     print ('GetNewTransNo(last_trans_no)', GetNewTransNo(last_trans_no))
-    new_transaction_number = GetNewTransNo(last_trans_no)
+    new_transaction_number = 'C' + GetNewTransNo(last_trans_no)
     data['counter_transaction_no'] = new_transaction_number
     data['guest_id'] = temp_info.guest_id
     data['price_prefix'] = class_info['price_prefix']
@@ -788,7 +790,7 @@ def Update_Counter_Transaction(temp_id):
         return partner_mail_send
     else:
         temp_guest.delete()
-        return '016'
+        return new_transaction_number
 
 def GetHistroyLearners(email):
     # Use email to filter history
@@ -815,3 +817,12 @@ def GetHistroyLearners(email):
         return ('No learner info')
 
         # name_list = transaction_item_profile.objects.values_list('email', flat=True).distinct()
+
+def GetTransactionNumber(temp_id):
+    # Use temp id to get transaction number in Transaction
+    try:
+        trans_info = Transaction.objects.get(newebpay_merchant_trade_no = temp_id)
+        trans_no = trans_info.transaction_no
+    except ObjectDoesNotExist:
+        return '021'
+    return trans_no
