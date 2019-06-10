@@ -10,7 +10,7 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/1.11/ref/settings/
 """
 
-import os
+import os, datetime
 
 # Build paths inside the project like this: os.path.join(BASE_DIR, ...)
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -153,37 +153,84 @@ FILE_UPLOAD_HANDLERS = [
 
 DATA_UPLOAD_MAX_MEMORY_SIZE = 50*1024*1024
 
+# LOGGING = {
+#     'version': 1,
+#     'disable_existing_loggers': False,
+#     'formatters': {
+#         'simple': {
+#             'format': '%(levelname)s %(asctime)s %(message)s',
+#         }
+#     },
+#     'handlers': {
+#         'console': {
+#             'class': 'logging.StreamHandler',
+#         },
+#         'file': {
+#             'class': 'logging.handlers.TimedRotatingFileHandler',
+#             'filename': 'storage/log/django_log.log',
+#             'when': 'D',
+#             'backupCount': 10,
+#             'delay': True,
+#             'formatter': 'simple',
+#         }
+#     },
+#     'loggers': {
+#         'django.request': {
+#             'handlers': ['file'],
+#             'level': 'INFO',  # change debug level as appropiate
+#             'propagate': False,
+#         },
+#         'django.program': {
+#             'handlers': ['file'],
+#             'propagate': False,
+#         },
+#     },
+# }
+
+LOG_PATH = '/app/log/'
+LOG_FILENAME = f'{datetime.datetime.now().strftime("%Y-%m-%d")}.log'
 LOGGING = {
     'version': 1,
-    'disable_existing_loggers': False,
-    'formatters': {
-        'simple': {
-            'format': '%(levelname)s %(asctime)s %(message)s',
-        }
-    },
-    'handlers': {
-        'console': {
-            'class': 'logging.StreamHandler',
-        },
-        'file': {
-            'class': 'logging.handlers.TimedRotatingFileHandler',
-            'filename': 'storage/log/django_log.log',
-            'when': 'D',
-            'backupCount': 10,
-            'delay': True,
-            'formatter': 'simple',
-        }
-    },
-    'loggers': {
-        'django.request': {
-            'handlers': ['file'],
-            'level': 'INFO',  # change debug level as appropiate
-            'propagate': False,
-        },
-        'django.program': {
-            'handlers': ['file'],
-            'propagate': False,
-        },
-    },
+   'disable_existing_loggers': False,
+   'formatters': {
+       'base': {
+           'format': '%(asctime)s %(levelname)-8s %(name)-10s %(message)s',
+       },
+   },
+   'handlers': {
+       'console': {
+           'class': 'logging.StreamHandler',
+           'formatter': 'base',
+       },
+       'file': {
+           'class': 'logging.handlers.RotatingFileHandler',
+           'filename': f'{LOG_PATH}{LOG_FILENAME}',
+           'backupCount': 3,
+           'formatter': 'base',
+       }
+   },
+   'loggers': {
+       'django': {
+           'handlers': ['file'],
+           'level': os.getenv('APP_LOG_LEVEL', 'DEBUG'),  # change debug level as appropiate
+           'propagate': True,
+       },
+       'django.request': {
+           'handlers': ['console'],
+           'propagate': True,
+       },
+       'django.server': {
+           'handlers': ['console'],
+           'propagate': True,
+       },
+       'django.template': {
+           'handlers': ['console'],
+           'propagate': True,
+       },
+       'django.db.backends': {
+           'handlers': ['console'],
+           'propagate': True,
+       }
+   },
 }
 

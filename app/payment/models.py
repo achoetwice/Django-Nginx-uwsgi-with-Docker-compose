@@ -726,6 +726,7 @@ class GuestTemporaryInfo(models.Model):
     auto_create_account = models.BooleanField(default=False)
     created_at = models.DateTimeField(blank=True, null=True)
     guest_id = models.CharField(max_length=255, blank=True, null=True)
+    line_id = models.CharField(max_length=255, blank=True, null=True)
 
     def save(self, *args, **kwargs):
         self.created_at = timezone.now()
@@ -1286,6 +1287,7 @@ class Transaction(models.Model):
     device_type = models.IntegerField()
     message_id = models.CharField(max_length=100, blank=True, null=True)
     other_amount = models.FloatField(default=0)
+    line_id = models.CharField(max_length=255, blank=True, null=True)
     # temp = models.FloatField(default=0)
 
     def save(self, *args, **kwargs):

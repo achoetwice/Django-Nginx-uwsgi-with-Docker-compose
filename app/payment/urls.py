@@ -15,4 +15,5 @@ urlpatterns = [
     # path('show_result/', views.Result.as_view()),
     path('history_learners/', views.HistoryLearners.as_view()),
     path('transaction_no/', views.GetTransactionNo.as_view()),
+    path('line_payment_history/', views.LinePaymentHistory.as_view()),
 ]

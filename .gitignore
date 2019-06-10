@@ -36,3 +36,7 @@ test.py
 *.sock
 udo lsof -i tcp:80 | egrep LISTEN
 *.env
+*.log
+
+# Git will upload the file with thisdocument, but empty the content in it 
+!.gitkeep

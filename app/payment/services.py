@@ -11,14 +11,17 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils import timezone
 from .gateway_service import *
-import requests
+import requests, logging
+
+# Get an instance of a logger
+logger = logging.getLogger('django.request')
 
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
 
-def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id):
+def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id):
     New_temp_info = GuestTemporaryInfo.objects.create(id =str(uuid.uuid4())[0:8], email = email, first_name = first_name, last_name = last_name, mobile = customer_mobile, \
-    learners = learners, schedule_id = schedule_id, auto_create_account = auto_create_account, guest_id= guest_id)
+    learners = learners, schedule_id = schedule_id, auto_create_account = auto_create_account, guest_id = guest_id, line_id = line_id)
     New_temp_info.save()
     return New_temp_info.id
 
@@ -481,7 +484,9 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     # To add device_type from platform or not, it's a question
     # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS'}
     data['device_type'] = 0
-
+    # Catch payment via LINE
+    if temp_info.line_id:
+        data['line_id'] = temp_info.line_id
     # stripe_charge_id = models.CharField(max_length=255, blank=True, null=True)
     if credict_return_data == 'NEWEBPAY':
         data['newebpay_merchant_trade_no'] = temp_id
@@ -826,3 +831,31 @@ def GetTransactionNumber(temp_id):
     except ObjectDoesNotExist:
         return '021'
     return trans_no
+
+def GetLineTransactions(line_id):
+    try:
+        trans_infos = Transaction.objects.filter(line_id = line_id).order_by('-transaction_no')
+    except Transaction.DoesNotExist:
+        return False
+    items_count = 0
+    trans_items = []
+    for trans in trans_infos:
+        try:
+            trans_item = TransactionItems.objects.get(transaction_id=trans.id)
+        except ObjectDoesNotExist:
+            return False
+        items_count += 1
+        if items_count >5:
+            break
+        data = {
+            'vendor_name' : trans_item.vendor_name,
+            'total_price' : trans_item.total_price,
+            'branch_name' : trans_item.branch_name,
+            'branch_address': trans_item.branch_address,
+            'class_name': trans_item.class_name,
+            'class_date': trans_item.class_date,
+            'class_time': trans_item.class_time
+        }
+        trans_items.append(data)
+        
+    return trans_items

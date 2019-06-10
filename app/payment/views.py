@@ -14,10 +14,12 @@ from helper.helper import APIHandler
 from .models import CurrencyLists, AwardCouponHistories
 from .services import *
 
-# class Apilist(APIView):
-#     def get(self, request):
-#         return render(request, 'rest_framework/api.html')
+import logging
 
+# Get an instance of a logger
+logger = logging.getLogger('django.request')
+
+# set variables
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
 
@@ -32,18 +34,18 @@ class StoreGuestTempInfo(APIView):
         learners = request.data.get('learners')
         schedule_id = request.data.get('schedule_id')
         auto_create_account = request.data.get('auto_create_account', 0)
+        line_id = request.data.get('line_id')
         # print ('temp guest info, ', type(learners))
         if not email or not first_name or not last_name or not customer_mobile or not auto_create_account:
             return APIHandler.catch('lack of informations', code='001')
         
-
         # Insert Guest information
         guest_id = SaveGuestInfos(email, first_name, last_name, customer_mobile)
         # print ('guest_id', guest_id)
         if not guest_id:
             return APIHandler.catch('Saving guest info failed', code='009')
         
-        temp_id = StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id)
+        temp_id = StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id)
 
         return APIHandler.catch(data={"temp_id":temp_id}, code='002')
         # Return store id
@@ -114,14 +116,16 @@ class NEWEBPAY_ReturnData(APIView):
     def post(self, request):
         # Get transaction data
         data = request.data
-        if data['Status'] != 'SUCCESS':
-            return APIHandler.catch('Fail to charge', code='999')
         # print ('newebpay_data', data)
-        data = NEWEBPAY_Decrypt(data['TradeInfo'])
-        # print ('data', data)
-        temp_id = data['Result']['MerchantOrderNo']
+        decrypt_data = NEWEBPAY_Decrypt(data['TradeInfo'])
+        temp_id = decrypt_data['Result']['MerchantOrderNo']
         temp_info = GetGuestTempInfo(temp_id)
         schedule_id = temp_info.schedule_id
+
+        if data['Status'] != 'SUCCESS':
+            logger.error (f'Fail to charge with credit card, transaction number(temp_id) {temp_id}')
+            return APIHandler.catch('Fail to charge', code='999')
+
         if not temp_info:
             return APIHandler.catch('Missing temp info', code='004')
         learners = eval(temp_info.learners)
@@ -305,6 +309,17 @@ class GetTransactionNo(APIView):
             return APIHandler.catch('Transaction not found', code='021')
         else:
             return APIHandler.catch(data={'transaction_no': trans_no}, code='000')
+
+class LinePaymentHistory(APIView):
+    def get(self, request):
+        # Use line id to search for history transactions
+        line_id = request.GET.get('line_id')
+        trans_items = GetLineTransactions(line_id)
+        if not trans_items:
+            return APIHandler.catch('Transaction not found', code='021')
+        else:
+            return APIHandler.catch(data=trans_items, code='000')
+
 
 # class TEST(APIView):
 #     def get(self, request):
