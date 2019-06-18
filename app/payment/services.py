@@ -1,5 +1,6 @@
 from .models import ClassSchedules, ClassOptions, ClassBranches, VendorClasses, VendorInfos, Transaction, GuestInfos, \
-CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo, TransactionCounterPay
+CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo, TransactionCounterPay, \
+ShoppingCarts, ShoppingcartProfiles, ShoppingcartSummaries, CustomerInfos, SchoolCouponInfos
 from payment.serializers import *
 from helper.helper import APIHandler
 from datetime import datetime, date
@@ -73,39 +74,6 @@ def GetClassInfo(schedule_id):
 
     return data
         
-# def CheckAgeValidation(learner, schedule_id):
-#     try:
-#         schedule = ClassSchedules.objects.get(pk= schedule_id)
-#     except ClassSchedules.DoesNotExist:
-#         return APIHandler("schedule not exist")
-#     classes = schedule.option.branch.classes
-#     birthday = datetime.strptime(learner['profile_dob'], '%Y/%m/%d')
-#     class_date = schedule.start_date.replace(tzinfo=None)
-#     time_diff = class_date - birthday
-#     print (time_diff)
-#     if classes.age_max == 'NULL' and classes.age_min == 'NULL':
-#         return True
-#     elif classes.age_max == 0 and classes.age_min == 0:
-#         return True
-#     elif classes.age_min == 'NULL':
-#         age_min = 0
-#     elif classes.age_max == 'NULL':
-#         age_max = 999
-#     else:
-#         age_min = classes.age_min
-#         age_max = classes.age_max
-#     valid_age = age_max - age_min
-
-#     age_year = time_diff.days // 365
-#     age_month = time_diff.days % 365 //30
-
-#     if age_min <= age_year <= age_max:
-#         return True
-#     elif age_min == 0 and age_max == 0:
-#         return True
-#     else:
-#         return False
-
 def SaveGuestInfos(email, first_name, last_name, customer_mobile):
     guest = GuestInfos()
     guest.email = email
@@ -137,7 +105,7 @@ def NEWEBPAY(schedule_id, learners, guest_id, temp_id):
     guest_infos = GetGuestInfo(guest_id)
 
     # Better Use environment variable instead
-    MerchantID = 'MS36244907'
+    MerchantID = os.getenv('MERCHANT_ID')
     key = os.getenv('NEWEBPAY_KEY')
     iv = os.getenv('NEWEBPAY_IV')
 
@@ -157,6 +125,74 @@ def NEWEBPAY(schedule_id, learners, guest_id, temp_id):
         # 'CustomerURL': None,
         # 'ClientBackURL': None, # 交易取消要去哪
         'Email':guest_infos.email, # 交易完成通知付款人（0.0）醬方便阿
+        'EmailModify': 0,
+        'LoginType': 0,
+        # 'OrderComment': f'{id_dict}',
+        'CREDIT': 1,
+        # 'InstFlag': 0, # 分期功能
+    }
+    print ('order_params', order_params)
+    
+    # AES encode 
+    AES_info_str = NEWEBPAY_AES(order_params, key, iv)
+
+    # SHA256 encode
+    AES_plus = 'HashKey=' + key + '&' + AES_info_str + '&' + 'HashIV=' + iv
+    SHA_info_STR = NEWEBPAY_SHA(AES_plus)
+    
+
+    data = {
+        'MerchantID':MerchantID,
+        'TradeInfo':AES_info_str,
+        'TradeSha':SHA_info_STR,
+        'Version':'1.5'
+    }
+    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
+    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
+    # dec = dec['Result']['MerchantOrderNo']
+    # print ('decrypt', dec)
+
+    return data
+
+def LEJ2_NEWEBPAY(shoppingcart_id):
+    """
+    MerchantID:藍新金流商店代號。
+    TradeInfo:1.將交易資料參數（下方列表中參數）透過商店 Key 及 IV 進行 AES 加密。
+    TradeSha:1.將交易資料經過上述 AES 加密過的字串，透過商店 Key 及 IV 進行 SHA256 加密。
+    Version:請帶 1.5
+    """
+    shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+    learners = shopping_cart_info['learners']
+    schedule_id = shopping_cart_info['schedule_id']
+    customer_id = shopping_cart_info['customer_id']
+    
+    class_info = GetClassInfo(schedule_id)
+    #  Use int only because it's TWD
+    ground_total = int(shopping_cart_info['ground_total'])
+    item_name = class_info['option_name']
+    customer_info = CustomerInfos.objects.get(id= customer_id)
+
+    # Better Use environment variable instead
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+
+    order_params = {
+        'MerchantID': MerchantID,
+        'RespondType': 'JSON',
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.5',
+        'LangType': 'zh-tw',
+        'MerchantOrderNo': shoppingcart_id,
+        'Amt': ground_total,
+        'ItemDesc': item_name,
+        'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
+        # 'ExpireDate': None,
+        # 'ReturnURL': None, # 引導消費者返回商店
+        'NotifyURL': public_url + '/payment/newebpay_return_lej2_data/', # 接收交易資訊
+        # 'CustomerURL': None,
+        # 'ClientBackURL': None, # 交易取消要去哪
+        'Email':customer_info.customer_email, # 交易完成通知付款人（0.0）醬方便阿
         'EmailModify': 0,
         'LoginType': 0,
         # 'OrderComment': f'{id_dict}',
@@ -362,6 +398,7 @@ def Update_Vacancy(schedule_id, learner_count):
         return True
 
 def GetNewTransNo(last_trans_no):
+    last_trans_no.strip('C')
     if not last_trans_no:
         today_y = int(str(date.today().year)[2:4])
         today_m = date.today().month
@@ -433,7 +470,7 @@ def GetNewTransItemNo(last_trans_no):
 
 
 @transaction.atomic
-def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data=[]):
+def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data=None, newebpay_decrypt_data=None):
     # credict_return_data = {'ATMAccBank': '', 'ATMAccNo': '',  'AlipayID': '', 'AlipayTradeNo': '', 'CustomField1': {'schedule_id': 'zpeexbynq0lazeymm4rs'}, 'CustomField2':{'guest_id': 'feb81dd2-8824-41d3-81b6-31f0b8a16e8c'}, 'CustomField3': '', 'CustomField4': '', 'ExecTimes': '', \
     #     'Frequency': '', 'HandlingCharge': '55', 'ItemName': [{'profile_name': 'Candy Yo', 'profile_dob': '2016/3/28', 'profile_note': ''}, {'profile_name': 'Andrew Yo', \
     #     'profile_dob': '2016/5/28', 'profile_note': 'cc'}],'MerchantID': '2000214', 'MerchantTradeNo': 'NO20190508043305', 'PayFrom': '', 'PaymentDate': '2019/05/08 12:33:27', \
@@ -467,6 +504,12 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     country_list = CountryLists.objects.get(country_name = vendor.vendor_country)
     # Sub toal without using any coupon for ecredit
     sub_total = learners_count * class_info['option_price']
+
+    # Lock vacancy and update
+    learner_count = len(learners)
+    lock = Update_Vacancy(schedule_id, learner_count)
+    if not lock:
+        return APIHandler.catch('Vacancy not enough or schedule error', code='012')
 
     # Update transaction
     new_transaction = Transaction()
@@ -670,21 +713,277 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         temp_guest.delete()
         return '014'
 
-@transaction.atomic
-def Update_Free_Transaction(temp_id, guest_id, schedule_id, learners):
-    # Get payment informations
-    # credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
-    # Get all needed class info by schedule_id
-    class_info = GetClassInfo(schedule_id)
 
+@transaction.atomic
+def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_decrypt_data=None):
+    shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+    schedule_id = shopping_cart_info['schedule_id']
+    learners = shopping_cart_info['learners']
+    coupon_infos = shopping_cart_info['coupon_infos']
+    
+    customer_info = CustomerInfos.objects.get(id= shopping_cart_info['customer_id'])
+    class_info = GetClassInfo(schedule_id)
+    learners_count = len(learners)
+
+    try:
+        with transaction.atomic():
+            schedule = ClassSchedules.objects.get(pk= schedule_id)
+    except ObjectDoesNotExist:
+        return '006'
+    option = schedule.option
+    branch = option.branch
+    classes = branch.classes
+    vendor = classes.vendor
+    country_list = CountryLists.objects.get(country_name = vendor.vendor_country)
+
+    # Sub toal without using any coupon for ecredit
+    sub_total = shopping_cart_info['ground_total']
+    
     # Lock vacancy and update
     learner_count = len(learners)
     lock = Update_Vacancy(schedule_id, learner_count)
     if not lock:
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
+
+    # Update transaction
+    new_transaction = Transaction()
+    data = {}
+    last_trans = Transaction.objects.latest('transaction_no')
+    print ('latest transactions, ', last_trans)
+    last_trans_no = last_trans.transaction_no
+    new_transaction_number = GetNewTransNo(last_trans_no)
+    data['transaction_no'] = new_transaction_number
+    data['customer_id'] = shopping_cart_info['customer_id']
+    data['ecredits_price'] = 0
+    # data['guest_id'] = temp_info.guest_id
+    data['price_prefix'] = class_info['price_prefix']
+
+    data['class_count'] = 1
+    # To add device_type from platform or not, it's a question
+    # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS'}
+    data['device_type'] = 4
+    if coupon_infos:
+        data['lejcoupon_id'] = coupon_infos.id
+        data['lejcoupon_code'] = coupon_infos.school_coupon_code
+    data['lej_coupon_price'] = shopping_cart_info['coupon_amount']
+    data['total_price'] = sub_total
+    data['other_amount'] = shopping_cart_info['other_amount']
+    # stripe_charge_id = models.CharField(max_length=255, blank=True, null=True)
+    if credict_return_data == 'NEWEBPAY':
+        data['newebpay_merchant_trade_no'] = shoppingcart_id
+    elif type(credict_return_data) is dict :
+        data['ecpay_merchant_trade_no'] = credict_return_data['MerchantTradeNo']
     
+    # print ('data', data)
+    for key,value in data.items():
+        setattr(new_transaction, key, value)
+    new_transaction.save()
+    # print ('uuid', str(uuid.uuid4()))
+
+    # Update_Transaction_item
+    new_transaction_item = TransactionItems()
+    item_data = {}
+    # Update transaction no in item
+    vendorCountryCode = country_list.country_code_alpha3
+    vendor_code = vendor.vendor_code
+    branchCode = VendorBranches.objects.get(pk = branch.branch_id).branch_code
+    code_prefix = vendorCountryCode + vendor_code + branchCode
+    last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
+    
+    if last_trans_item:
+        last_trans_item = last_trans_item[0]
+        # print ('last_trans_item', last_trans_item.booking_no)
+        last_trans_item_no = last_trans_item.booking_no.replace(code_prefix, '')
+        new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
+        item_data['booking_no'] = code_prefix + new_trans_item_no
+    else:
+        last_trans_item_no = '000000000'
+        new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
+        item_data['booking_no'] = code_prefix + new_trans_item_no
+    item_data['transaction_id'] = new_transaction.pk
+    item_data['booking_class_id'] = class_info['class_id']
+    item_data['booking_schedule_id'] = schedule_id
+    item_data['vendor_id'] = class_info['vendor_id']
+    item_data['vendor_branch_id'] = class_info['branch_id']
+    item_data['class_name'] = class_info['class_name']
+    item_data['option_name'] = class_info['option_name']
+    item_data['schedule_name'] = class_info['schedule_name']
+    item_data['vendor_name'] = class_info['vendor_name']
+    # item_data['school_coupon_id'] = 'NULL'
+    # item_data['school_coupon_code'] = 'NULL'
+    item_data['original_price'] = sub_total
+    item_data['register_price'] = 0
+    item_data['school_coupon_price'] = 0
+    item_data['merchandise_price'] = 0
+    item_data['total_price'] = sub_total
+    # item_data['special_note'] = ''
+    item_data['branch_address'] = class_info['address']
+    item_data['branch_name'] = class_info['branch_name']
+    item_data['age_min'] = classes.age_min
+    item_data['age_max'] = classes.age_max
+    item_data['learner_count'] = learners_count
+    item_data['class_date'] = class_info['schedule_name']
+    item_data['class_time'] = schedule.start_time + '-' + schedule.end_time
+    item_data['redeem'] = 0
+    item_data['confirm'] = 0
+    item_data['price_prefix'] = class_info['price_prefix']
+    # item_data['special_name'] = ''
+    # item_data['special_discount'] = ''
+    for key,value in item_data.items():
+        setattr(new_transaction_item, key, value)
+    new_transaction_item.save()
+
+    # Update booking_class
+    new_booking_class = BookingClasses()
+    book_data = {}
+    book_data['transaction_item_id'] = new_transaction_item.pk
+    book_data['class_name'] = class_info['class_name']
+    book_data['vendor_id'] = class_info['vendor_id']
+    book_data['description'] = classes.description
+    book_data['age_min'] = classes.age_min
+    book_data['age_max'] = classes.age_max
+    book_data['cover_image'] = classes.cover_image
+    # book_data['image_list'] = classes.image_list
+    book_data['youtube_code'] = classes.youtube_code
+    book_data['teaching_type_1'] = classes.teaching_type_1
+    book_data['teaching_type_2'] = classes.teaching_type_2
+    book_data['teaching_type_3'] = classes.teaching_type_3
+    book_data['teaching_type_4'] = classes.teaching_type_4
+    book_data['teaching_type_5'] = classes.teaching_type_5
+    book_data['teaching_type_6'] = classes.teaching_type_6
+    book_data['teaching_type_7'] = classes.teaching_type_7
+    book_data['teaching_type_8'] = classes.teaching_type_8
+    book_data['comment_status'] = classes.comment_status
+    book_data['view_count'] = classes.view_count
+    book_data['ad_paid'] = classes.ad_paid
+    book_data['start_date'] = schedule.start_date
+    book_data['end_date'] = schedule.end_date
+    for key,value in book_data.items():
+        setattr(new_booking_class, key, value)
+    new_booking_class.save()
+
+    # Update branch history
+    new_branch_history = BranchHistories()
+    hist_data = {}
+    hist_data['booking_class_id'] = new_booking_class.pk
+    hist_data['class_branch'] = branch.class_branch
+    hist_data['class_id'] = branch.classes.pk
+    hist_data['country'] = branch.country
+    hist_data['city'] = branch.city
+    hist_data['address'] = branch.address
+    hist_data['latitude'] = branch.latitude
+    hist_data['longitude'] = branch.longitude
+    for key,value in hist_data.items():
+        setattr(new_branch_history, key, value)
+    new_branch_history.save()
+
+    temp_learners = deepcopy(learners)
+    # print ('WTDDDDDDDDDDDDDDD', temp_learners)
+    
+    # Update transactionItemProfile
+    for learner in temp_learners:
+        print ('learner format', learner)
+        prof_data = {}
+        new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
+        # print ('new_transactionitem_profile', new_transactionitem_profile)
+        prof_data['transaction_item_id'] = new_transaction_item.pk
+        prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
+        prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
+        # print ('learner[profile_dob]', learner['profile_dob'])
+        if learner.get('profile_dob', None):
+            try:
+                with transaction.atomic():
+                    learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y/%m/%d').date()
+                    print ('change format 1')
+            except ValueError:
+                learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y-%m-%d').date()
+                print ('change format 2')
+            except:
+                prof_data['profile_dob'] = learner['profile_dob']
+                print ('change format 3')
+                # return '013'
+        # print ('learner[profile_dob] after', learner['profile_dob'])
+        prof_data['profile_dob'] = learner['profile_dob']
+        # print ('end of learner dob')
+        prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
+        print ('end of learner note')
+        for key,value in prof_data.items():
+            print ('key, value', key, ',', value)
+            setattr(new_transactionitem_profile, key, value)
+        new_transactionitem_profile.save()
+    
+    # Get shopping cart info, send mail, then delete
+    shopping_cart = ShoppingCarts.objects.get(id = shoppingcart_id)
+    shopping_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = shopping_cart.customer_id).order_by('-date_added')
+    learner_profiles = ShoppingcartProfiles.objects.filter(shoppingcart_id = shoppingcart_id)
+    
+
+    # Send email to both customer and partner if Transaction done
+    for learner in learners:
+        if isinstance(learner['profile_dob'], date):
+            learner['profile_dob'] = learner['profile_dob'].strftime('%Y-%m-%d')
+    mail_data = {
+        "guest_email": customer_info.customer_email,
+        "partner_email": vendor.vendor_email,
+        "class_hold_by": class_info['vendor_name'],
+        "branch": class_info['branch_name'],
+        "learners": learners,
+        "class_name": class_info['class_name'],
+        "class_option": class_info['option_name'],
+        "class_date" : class_info['schedule_name'],
+        "class_time" : schedule.start_time + '-' + schedule.end_time,
+        "price": str(sub_total),
+        "payment_type": 'Credit',
+        "customer_name": customer_info.customer_lastname + customer_info.customer_firstname,
+        "customer_mobile": customer_info.customer_mobile,
+        "transaction_number": new_transaction_number
+    }
+    print ('mail_data', mail_data)
+    customer_service = public_url_sendmail+'/sendmail/guest/'
+    partner_service = public_url_sendmail+'/sendmail/partner/'
+    customer_mail_send = requests.post(customer_service,json=mail_data)
+    print ('customer_mail_send', customer_mail_send)
+    partner_mail_send = requests.post(partner_service,json=mail_data)
+    if customer_mail_send.status_code != 200 or partner_mail_send.status_code != 200:
+        print ('customer_mail_send.status_code', customer_mail_send.status_code)
+        return '020'
+    customer_mail_send = eval(customer_mail_send.content)
+    partner_mail_send = eval(partner_mail_send.content)
+    if not customer_mail_send['code'] == '005000':
+        return customer_mail_send
+    elif not partner_mail_send['code'] == '005000':
+        return partner_mail_send
+    else:
+        shopping_cart.delete()
+        shopping_cart_sum.delete()
+        learner_profiles.delete()
+        return '014'
+
+@transaction.atomic
+def Update_Free_Transaction(temp_id, schedule_id, learners):
+    # Get payment informations
+    # credict_return_data = {'CustomField2':str({'g_id':guest_id}), 'CustomField3':str({'t_id':temp_id}), 'MerchantTradeNo':''}
+    # Get all needed class info by schedule_id
+    class_info = GetClassInfo(schedule_id)
+
     # Start transaction to transactions
     trans = Update_Transaction(temp_id, schedule_id, learners, class_info)
+    if trans == '006':
+        return '006'
+    elif trans == '013':
+        return '013'
+    elif trans == '014':
+        return '014'
+    elif trans == '020':
+        return '020'
+    else:
+        return '017'
+
+@transaction.atomic
+def Update_Free_LEJ2_Transaction(shoppingcart_id):
+    # Get payment informations
+    # Start transaction to transactions
+    trans = Update_LEJ2_Transaction(shoppingcart_id)
     if trans == '006':
         return '006'
     elif trans == '013':
@@ -859,3 +1158,38 @@ def GetLineTransactions(line_id):
         trans_items.append(data)
         
     return trans_items
+
+def GET_SHOPPINGCART_INFOS(shoppingcart_id):
+    try:
+        shopping_cart = ShoppingCarts.objects.get(id = shoppingcart_id)
+        shopping_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = shopping_cart.customer_id).order_by('-date_added')
+        learner_profiles = ShoppingcartProfiles.objects.filter(shoppingcart_id = shoppingcart_id)
+    except ObjectDoesNotExist:
+        return '022'
+
+    learners = []
+    for learner in learner_profiles:
+        learner_info = {
+            'profile_name': learner.profile_name,
+            'profile_dob': learner.profile_dob,
+            'profile_note': learner.profile_note
+        }
+        learners.append(learner_info)
+    schedule_id = shopping_cart.schedule_id
+    customer_id = shopping_cart.customer_id  # 用來獲取email的object
+    coupon_id = shopping_cart.coupon_id
+    try:
+        coupon_infos = SchoolCouponInfos.objects.get(id = coupon_id)
+    except ObjectDoesNotExist:
+        coupon_infos = None
+    cart_infos = {
+        'learners': learners,
+        'schedule_id': schedule_id,
+        'customer_id': customer_id,
+        'ground_total': shopping_cart_sum[0].ground_total,
+        'other_amount': shopping_cart_sum[0].other_amount,
+        'coupon_infos': coupon_infos,
+        'coupon_amount': shopping_cart.coupon_amount,
+    }
+    logger.info (f'cart_infos, {cart_infos}')
+    return cart_infos

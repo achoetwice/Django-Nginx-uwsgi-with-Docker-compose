@@ -4,9 +4,6 @@ import binascii
 import hashlib
 import json, string
 
-def strip_unprintable(data):
-    return ''.join(c for c in data if c in string.printable)
-
 def AES_encrypt(data, key, iv):
     cryptor = AES.new(key, AES.MODE_CBC, iv)
     return cryptor.encrypt(data)
@@ -38,10 +35,19 @@ def NEWEBPAY_SHA(AES_plus):
     return SHA_info_STR
     
 def NEWEBPAY_AES_decrypt(AES_info_str, key, iv):
+    # print ('AES_info_str', AES_info_str)
     AES_info = AES_info_str.encode('utf-8')
+    # print ('AES_info_str22utf-8', AES_info)
     AES_info = binascii.unhexlify(AES_info)
+    # print ('AES_info_unhexlify', AES_info)
     AES_info = AES_decrypt(AES_info, key, iv)
-    AES_info = str(AES_info, 'ascii')
-    AES_info = eval(strip_unprintable(AES_info))
+    # print ('raw decrypt AES_info', AES_info)
+    # AES_info = str(AES_info, 'ascii')
+    AES_info = AES_info.decode("utf-8")
+    padding_str = AES_info[-1]
+    # print ('padding_str', padding_str)
+    AES_info = AES_info.strip(padding_str)
+    # print ('AES_info', AES_info)
+    AES_info = json.loads(AES_info)
     # print ('AES_info2', AES_info)
     return (AES_info)

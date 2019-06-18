@@ -462,7 +462,7 @@ class CustomerActivities(models.Model):
 
 
 class CustomerInfos(models.Model):
-    # pk = models.CharField(unique=True, max_length=30)
+    id = models.CharField(default=str(uuid.uuid4())[0:30], primary_key=True, unique=True, max_length=40, db_column='pk')
     customer_id = models.CharField(max_length=30, blank=True, null=True)
     customer_group_id = models.IntegerField(blank=True, null=True)
     signup_group_id = models.IntegerField(blank=True, null=True)
@@ -1088,7 +1088,7 @@ class SchoolCouponHistories(models.Model):
 
 
 class SchoolCouponInfos(models.Model):
-    # pk = models.CharField(primary_key=True, max_length=30)
+    id = models.CharField(primary_key=True, unique=True, max_length=30, db_column='pk')
     school_coupon_name = models.CharField(max_length=128)
     school_coupon_code = models.CharField(max_length=20)
     school_discount_minus = models.DecimalField(max_digits=15, decimal_places=4, blank=True, null=True)
@@ -1187,7 +1187,7 @@ class Scrapbooks(models.Model):
 
 
 class ShoppingCarts(models.Model):
-    # pk = models.CharField(unique=True, max_length=40, blank=True, null=True)
+    id = models.CharField(default=str(uuid.uuid4())[0:20], primary_key=True, unique=True, max_length=40, db_column='pk')
     customer_id = models.CharField(max_length=40)
     schedule_id = models.CharField(max_length=40)
     coupon_id = models.CharField(max_length=40, blank=True, null=True)
@@ -1221,7 +1221,7 @@ class ShoppingcartMerchandises(models.Model):
 
 
 class ShoppingcartProfiles(models.Model):
-    # pk = models.CharField(unique=True, max_length=40, blank=True, null=True)
+    id = models.CharField(default=str(uuid.uuid4())[0:20], primary_key=True, unique=True, max_length=40, db_column='pk')
     shoppingcart_id = models.CharField(max_length=40)
     profile_id = models.CharField(max_length=40, blank=True, null=True)
     profile_name = models.CharField(max_length=40)
@@ -1237,7 +1237,7 @@ class ShoppingcartProfiles(models.Model):
 
 
 class ShoppingcartSummaries(models.Model):
-    # pk = models.CharField(unique=True, max_length=30, blank=True, null=True)
+    id = models.CharField(default=str(uuid.uuid4())[0:20], primary_key=True, unique=True, max_length=40, db_column='pk')
     customer_id = models.CharField(max_length=30)
     used_ecredits = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
     price_prefix = models.CharField(max_length=5, blank=True, null=True)
@@ -1246,6 +1246,7 @@ class ShoppingcartSummaries(models.Model):
     date_modified = models.DateTimeField()
     ground_total = models.DecimalField(max_digits=15, decimal_places=2)
     used_lej_coupon_price = models.DecimalField(max_digits=15, decimal_places=2, blank=True, null=True)
+    other_amount = models.FloatField(default=0)
 
     class Meta:
         managed = False

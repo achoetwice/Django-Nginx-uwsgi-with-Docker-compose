@@ -6,15 +6,14 @@ from rest_framework.response import Response
 from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
 import requests
-import json
+from helper.helper import APIHandler
+import logging
 
 from payment.serializers import *
-from helper.helper import APIHandler
-
 from .models import CurrencyLists, AwardCouponHistories
 from .services import *
 
-import logging
+
 
 # Get an instance of a logger
 logger = logging.getLogger('django.request')
@@ -82,13 +81,11 @@ class GuestPaynow(APIView):
         elif learner_count > class_info['vacancy']:
             return APIHandler.catch('No vacancy', code='008')
 
-        # # # Confirm age is valid
-
         guest_id = temp_info.guest_id
         
         # Handle the free class by skip ECPAY
         if class_info['option_price'] <= 0:
-            trans = Update_Free_Transaction(temp_id, guest_id, schedule_id, learners)
+            trans = Update_Free_Transaction(temp_id, schedule_id, learners)
             if trans == '006':
                 return APIHandler.catch('Schedule not exist', code='006')
             elif trans == '013':
@@ -132,18 +129,42 @@ class NEWEBPAY_ReturnData(APIView):
         # Get all needed class info by schedule_id
         class_info = GetClassInfo(schedule_id)
 
-        # Lock vacancy and update
-        learner_count = len(learners)
-        lock = Update_Vacancy(schedule_id, learner_count)
-        if not lock:
-            return APIHandler.catch('Vacancy not enough or schedule error', code='012')
+        
 
         # Get credict_return_data
         credict_return_data = 'NEWEBPAY'
         # Todo here: check credict card record in newebpay
         
         # Start transaction to transactions
-        trans = Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
+        trans = Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data, newebpay_decrypt_data=decrypt_data['Result'])
+        if trans == '006':
+            return APIHandler.catch('Schedule not exist', code='006')
+        elif trans == '013':
+            return APIHandler.catch('Learner dob format not legible', code='013')
+        
+        else:
+            print ('trans', trans)
+            return APIHandler.catch('ok', code='014')
+
+class NEWEBPAY_LEJ2_ReturnData(APIView):
+    def post(self, request):
+        # Get transaction data
+        data = request.data
+        print ('newebpay_data', data)
+        decrypt_data = NEWEBPAY_Decrypt(data['TradeInfo'])
+        print ('dec newebpay_data', decrypt_data)
+        shoppingcart_id = decrypt_data['Result']['MerchantOrderNo']
+        print ('shoppingcart_id', shoppingcart_id)
+        if data['Status'] != 'SUCCESS':
+            logger.error (f'Fail to charge with credit card, transaction number(shoppingcart_id) {shoppingcart_id}')
+            return APIHandler.catch('Newebpay Fail to charge', code='023')
+
+        # Get credict_return_data
+        credict_return_data = 'NEWEBPAY'
+        # Todo here: check credict card record in newebpay
+        
+        # Start transaction to transactions
+        trans = Update_LEJ2_Transaction(shoppingcart_id, credict_return_data, newebpay_decrypt_data=decrypt_data['Result'])
         if trans == '006':
             return APIHandler.catch('Schedule not exist', code='006')
         elif trans == '013':
@@ -169,12 +190,6 @@ class ECPAY_ReturnData(APIView):
         learners = eval(temp_info.learners)
         # Get all needed class info by schedule_id
         class_info = GetClassInfo(schedule_id)
-
-        # Lock vacancy and update
-        learner_count = len(learners)
-        lock = Update_Vacancy(schedule_id, learner_count)
-        if not lock:
-            return APIHandler.catch('Vacancy not enough or schedule error', code='012')
         
         # Start transaction to transactions
         trans = Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data)
@@ -266,7 +281,7 @@ class MailGuestPaynow(APIView):
         
         # Handle the free class by skip ECPAY
         if class_info['option_price'] <= 0:
-            trans = Update_Free_Transaction(temp_id, guest_id, schedule_id, learners)
+            trans = Update_Free_Transaction(temp_id, schedule_id, learners)
             if trans == '006':
                 return APIHandler.catch('Schedule not exist', code='006')
             elif trans == '013':
@@ -279,6 +294,57 @@ class MailGuestPaynow(APIView):
         # Start to ECpay and redirect to payment html 
         # html = ECPAY(schedule_id, learners, guest_id, temp_id)
         pay_data = NEWEBPAY(schedule_id, learners, guest_id, temp_id)
+        # print (html)
+        # if html:
+        #     return render(request, 'ECPAY_pay.html', {'html':html})
+        if pay_data:
+            return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
+        else:
+            return APIHandler.catch('Fail to generate payment page', code='011')
+        return APIHandler.catch('Sending mail success', code='999')
+
+class LEJ2_WebCustomerPaynow(APIView):
+    def post(self, request):
+        # Get shopping cart summary
+        logger.info ('web here')
+        shoppingcart_id = request.data.get('shoppingcart_id')
+        shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+        if shopping_cart_info == '022':
+            return APIHandler.catch('Missing shopping cart informations', code='022')
+        elif not shopping_cart_info:
+            return APIHandler.catch('Missing temp info', code='004')
+        logger.info (f'cart info here {shopping_cart_info}')
+        # auto_create_account = temp_info.auto_create_account
+        # THIS ONE IS FOR GUESTPAY on WEB
+
+        # Get all needed class info by schedule_id
+        schedule_id = shopping_cart_info['schedule_id']
+        learners = shopping_cart_info['learners']
+        class_info = GetClassInfo(schedule_id)
+        if not class_info:
+            return APIHandler.catch('Schedule not exist', code='006')
+        # Confirm vacancy
+        learner_count = len(learners)
+        if not learners:
+            return APIHandler.catch('Missing learner info', code='007')
+        elif learner_count > class_info['vacancy']:
+            return APIHandler.catch('No vacancy', code='008')
+        
+        # Handle the free class by skip ECPAY
+        if class_info['option_price'] <= 0:
+            trans = Update_Free_LEJ2_Transaction(shoppingcart_id)
+            if trans == '006':
+                return APIHandler.catch('Schedule not exist', code='006')
+            elif trans == '013':
+                return APIHandler.catch('Learner dob format not legible', code='013')
+            elif trans == '014':
+                return APIHandler.catch('Success, free class, go to transactions', code='010')
+            else:
+                return APIHandler.catch('Free transaction problem', code='017')
+
+        # Start to ECpay and redirect to payment html 
+        # html = ECPAY(schedule_id, learners, guest_id, temp_id)
+        pay_data = LEJ2_NEWEBPAY(shoppingcart_id)
         # print (html)
         # if html:
         #     return render(request, 'ECPAY_pay.html', {'html':html})
@@ -305,7 +371,7 @@ class GetTransactionNo(APIView):
     def get(self, request):
         temp_id = request.GET.get('temp_id')
         trans_no = GetTransactionNumber(temp_id)
-        if temp_id == '021':
+        if trans_no == '021':
             return APIHandler.catch('Transaction not found', code='021')
         else:
             return APIHandler.catch(data={'transaction_no': trans_no}, code='000')

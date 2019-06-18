@@ -40,6 +40,7 @@ INSTALLED_APPS = [
     'django.contrib.sitemaps',
     'rest_framework',
     'payment',
+    'invoice',
 ]
 
 MIDDLEWARE = [
