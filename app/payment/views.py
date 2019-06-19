@@ -244,7 +244,7 @@ class PayByMail(APIView):
         else:
             return APIHandler.catch('Sending mail success', code='019')
 
-class MailGuestPaynow(APIView):
+class UrlGuestPaynow(APIView):
     def get(self, request, temp_id):
         temp_id = temp_id
         if not temp_id:
@@ -303,7 +303,9 @@ class MailGuestPaynow(APIView):
             return APIHandler.catch('Fail to generate payment page', code='011')
         return APIHandler.catch('Sending mail success', code='999')
 
-class LEJ2_WebCustomerPaynow(APIView):
+'''
+# Use schedule_id to charge only one class
+class LEJ2_Web_CustomerPaynow(APIView):
     def post(self, request):
         # Get shopping cart summary
         logger.info ('web here')
@@ -353,7 +355,130 @@ class LEJ2_WebCustomerPaynow(APIView):
         else:
             return APIHandler.catch('Fail to generate payment page', code='011')
         return APIHandler.catch('Sending mail success', code='999')
+'''
 
+class LEJ2_CustomerPaynow(APIView):
+    def post(self, request):
+        # Get shopping cart summary
+        logger.info ('web here')
+        customer_id = request.data.get('customer_id')
+        customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
+        if customer_cart_items.count == 0:
+            return APIHandler.catch('No class in customer\'s cart', code='024')
+
+        cart_price = 0
+        for shopping_cart_info in customer_cart_items:
+            # shoppingcart_id = cart_item.shoppingcart_id
+            # shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+        # if shopping_cart_info == '022':
+        #     return APIHandler.catch('Missing shopping cart informations', code='022')
+        # elif not shopping_cart_info:
+        #     return APIHandler.catch('Missing temp info', code='004')
+        # logger.info (f'cart info here {shopping_cart_info}')
+        # auto_create_account = temp_info.auto_create_account
+        # THIS ONE IS FOR GUESTPAY on WEB
+
+            # Get all needed class info by schedule_id
+            shoppingcart_id = shopping_cart_info.id
+            cart_infos = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+            schedule_id = cart_infos['schedule_id']
+            learners = cart_infos['learners']
+            class_info = GetClassInfo(schedule_id)
+            if not class_info:
+                return APIHandler.catch('Schedule not exist', code='006')
+            # Confirm vacancy
+            learner_count = len(learners)
+            if not learners:
+                return APIHandler.catch('Missing learner info', code='007')
+            elif learner_count > class_info['vacancy']:
+                return APIHandler.catch('No vacancy', code='008')
+            cart_price += class_info['option_price']
+        
+        # Handle the free class by skip ECPAY
+        if cart_price <= 0:
+            trans = Update_Free_LEJ2_Transaction(customer_id)
+            if trans == '006':
+                return APIHandler.catch('Schedule not exist', code='006')
+            elif trans == '013':
+                return APIHandler.catch('Learner dob format not legible', code='013')
+            elif trans == '014':
+                return APIHandler.catch('Success, free class, go to transactions', code='010')
+            else:
+                return APIHandler.catch('Free transaction problem', code='017')
+
+        # Start to ECpay and redirect to payment html 
+        # html = ECPAY(schedule_id, learners, guest_id, temp_id)
+        pay_data = LEJ2_NEWEBPAY(customer_id)
+        # print (html)
+        # if html:
+        #     return render(request, 'ECPAY_pay.html', {'html':html})
+        if pay_data:
+            return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
+        else:
+            return APIHandler.catch('Fail to generate payment page', code='011')
+        return APIHandler.catch('Sending mail success', code='999')
+
+class LEJ2_Url_CustomerPaynow(APIView):
+    def get(self, request, customer_id):
+        customer_id = customer_id
+        if not customer_id:
+            return APIHandler.catch('Please provide customer_id', code='003')
+        customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
+        if customer_cart_items.count == 0:
+            return APIHandler.catch('No class in customer\'s cart', code='024')
+
+        cart_price = 0
+        for shopping_cart_info in customer_cart_items:
+            # shoppingcart_id = cart_item.shoppingcart_id
+            # shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+        # if shopping_cart_info == '022':
+        #     return APIHandler.catch('Missing shopping cart informations', code='022')
+        # elif not shopping_cart_info:
+        #     return APIHandler.catch('Missing temp info', code='004')
+        # logger.info (f'cart info here {shopping_cart_info}')
+        # auto_create_account = temp_info.auto_create_account
+        # THIS ONE IS FOR GUESTPAY on WEB
+
+            # Get all needed class info by schedule_id
+            shoppingcart_id = shopping_cart_info.id
+            cart_infos = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+            schedule_id = cart_infos['schedule_id']
+            learners = cart_infos['learners']
+            class_info = GetClassInfo(schedule_id)
+            if not class_info:
+                return APIHandler.catch('Schedule not exist', code='006')
+            # Confirm vacancy
+            learner_count = len(learners)
+            if not learners:
+                return APIHandler.catch('Missing learner info', code='007')
+            elif learner_count > class_info['vacancy']:
+                return APIHandler.catch('No vacancy', code='008')
+            cart_price += class_info['option_price']
+        
+        # Handle the free class by skip ECPAY
+        if cart_price <= 0:
+            trans = Update_Free_LEJ2_Transaction(customer_id)
+            if trans == '006':
+                return APIHandler.catch('Schedule not exist', code='006')
+            elif trans == '013':
+                return APIHandler.catch('Learner dob format not legible', code='013')
+            elif trans == '014':
+                return APIHandler.catch('Success, free class, go to transactions', code='010')
+            else:
+                return APIHandler.catch('Free transaction problem', code='017')
+
+        # Start to ECpay and redirect to payment html 
+        # html = ECPAY(schedule_id, learners, guest_id, temp_id)
+        pay_data = LEJ2_NEWEBPAY(customer_id)
+        # print (html)
+        # if html:
+        #     return render(request, 'ECPAY_pay.html', {'html':html})
+        if pay_data:
+            return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
+        else:
+            return APIHandler.catch('Fail to generate payment page', code='011')
+        return APIHandler.catch('Sending mail success', code='999')
+        
 class ClosePage(APIView):
     def get(self, request):
         return render(request, 'close_page.html')
@@ -386,6 +511,7 @@ class LinePaymentHistory(APIView):
         else:
             return APIHandler.catch(data=trans_items, code='000')
 
+# class CleanShoopingCart
 
 # class TEST(APIView):
 #     def get(self, request):

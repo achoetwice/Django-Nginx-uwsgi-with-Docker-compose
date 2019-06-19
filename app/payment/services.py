@@ -154,22 +154,24 @@ def NEWEBPAY(schedule_id, learners, guest_id, temp_id):
 
     return data
 
-def LEJ2_NEWEBPAY(shoppingcart_id):
+def LEJ2_NEWEBPAY(customer_id):
     """
     MerchantID:藍新金流商店代號。
     TradeInfo:1.將交易資料參數（下方列表中參數）透過商店 Key 及 IV 進行 AES 加密。
     TradeSha:1.將交易資料經過上述 AES 加密過的字串，透過商店 Key 及 IV 進行 SHA256 加密。
     Version:請帶 1.5
     """
-    shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
-    learners = shopping_cart_info['learners']
-    schedule_id = shopping_cart_info['schedule_id']
-    customer_id = shopping_cart_info['customer_id']
-    
-    class_info = GetClassInfo(schedule_id)
+    customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
+    customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+    shoppingcart_sum_id = customer_cart_sum.id
+
     #  Use int only because it's TWD
-    ground_total = int(shopping_cart_info['ground_total'])
-    item_name = class_info['option_name']
+    ground_total = int(customer_cart_sum.ground_total)
+    item_name = ''
+    for shopping_cart_info in customer_cart_items:
+        schedule_id = shopping_cart_info.schedule_id
+        class_info = GetClassInfo(schedule_id)
+        item_name += class_info['option_name'] + ' '
     customer_info = CustomerInfos.objects.get(id= customer_id)
 
     # Better Use environment variable instead
@@ -183,7 +185,7 @@ def LEJ2_NEWEBPAY(shoppingcart_id):
         'TimeStamp': f'{int(time.time())}',
         'Version': '1.5',
         'LangType': 'zh-tw',
-        'MerchantOrderNo': shoppingcart_id,
+        'MerchantOrderNo': shoppingcart_sum_id,
         'Amt': ground_total,
         'ItemDesc': item_name,
         'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
@@ -1193,3 +1195,11 @@ def GET_SHOPPINGCART_INFOS(shoppingcart_id):
     }
     logger.info (f'cart_infos, {cart_infos}')
     return cart_infos
+
+def GET_CUSTOMER_CART_ITEMS(customer_id):
+    customer_cart_items = ShoppingCarts.objects.filter(customer_id=customer_id)
+    return customer_cart_items
+
+def GET_CUSTOMER_CART_SUM(customer_id):
+    customer_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = customer_id).order_by('-date_added')[0]
+    return customer_cart_sum
