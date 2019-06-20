@@ -1160,10 +1160,9 @@ def GetHistroyLearners(email):
 def GetTransactionNumber(temp_id):
     # Use temp id to get transaction number in Transaction
     try:
-        trans_info = Transaction.objects.get(newebpay_merchant_trade_no = temp_id)
-        trans_no = trans_info.transaction_no
-    except ObjectDoesNotExist:
-        return '021'
+        trans_no = Transaction.objects.get(newebpay_merchant_trade_no = temp_id).transaction_no
+    except:
+        return False
     return trans_no
 
 def GetLineTransactions(line_id):
@@ -1265,7 +1264,7 @@ def CLEAN_SHOPPINGCART(customer_id):
         customer = CustomerInfos.objects.get(id = customer_id)
     except:
         return False
-        
+
     shopping_cart = ShoppingCarts.objects.filter(customer_id = customer_id)
     if len(shopping_cart) == 0:
         return True
@@ -1273,3 +1272,17 @@ def CLEAN_SHOPPINGCART(customer_id):
         for item in shopping_cart:
             item.delete()
         return True
+
+def GET_SHOPPINGCART_SUM_ID(customer_id):
+    try:
+        cart_sum_id = ShoppingcartSummaries.objects.get(customer_id = customer_id).id
+    except:
+        return False
+    return cart_sum_id
+
+def LEJ2_GetTransactionNumber(summary_id):
+    try:
+        trans_no = Transaction.objects.get(newebpay_merchant_trade_no = summary_id).transaction_no
+    except:
+        return False
+    return trans_no

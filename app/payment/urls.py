@@ -20,4 +20,5 @@ urlpatterns = [
     path('transaction_no/', views.GetTransactionNo.as_view()),
     path('line_payment_history/', views.LinePaymentHistory.as_view()),
     path('lej2_clean_shoppingcart/', views.LEJ2_CleanUpShoppingCart.as_view()),
+    path('lej2_shoppingcart_sumID/', views.LEJ2_GetShoppingcart_Summary_ID.as_view()),
 ]

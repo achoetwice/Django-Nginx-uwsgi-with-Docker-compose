@@ -499,8 +499,10 @@ class HistoryLearners(APIView):
 class GetTransactionNo(APIView):
     def get(self, request):
         temp_id = request.GET.get('temp_id')
+        if not temp_id:
+            return APIHandler.catch('Please provide temp_id', code='003')
         trans_no = GetTransactionNumber(temp_id)
-        if trans_no == '021':
+        if not trans_no:
             return APIHandler.catch('Transaction not found', code='021')
         else:
             return APIHandler.catch(data={'transaction_no': trans_no}, code='000')
@@ -541,3 +543,14 @@ class LEJ2_CleanUpShoppingCart(APIView):
         if not clear_state:
             return APIHandler.catch('Customer not exist', code='026')
         return APIHandler.catch('Shopping cart clear', code='027')
+
+class LEJ2_GetShoppingcart_Summary_ID(APIView):
+    def get(self, request):
+        customer_id = request.GET.get('customer_id')
+        if not customer_id:
+            return APIHandler.catch('Need customer_id', code='025')
+        summary_id = GET_SHOPPINGCART_SUM_ID(customer_id)
+        if not summary_id:
+            return APIHandler.catch('Shopping car no summary yet', code='028')
+        else:
+            return APIHandler.catch(data={'summary_id':summary_id}, code='000')
