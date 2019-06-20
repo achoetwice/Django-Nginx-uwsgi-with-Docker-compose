@@ -531,5 +531,13 @@ class LinePaymentHistory(APIView):
 
 #         return render(request, 'ECPAY_pay.html', {'html':html})
 
-
-
+class LEJ2_CleanUpShoppingCart(APIView):
+    def delete(self, request):
+        # Use customer_id to clean all classes in shopping cart
+        customer_id = request.data.get('customer_id')
+        if not customer_id:
+            return APIHandler.catch('Need customer_id', code='025')
+        clear_state = CLEAN_SHOPPINGCART(customer_id)
+        if not clear_state:
+            return APIHandler.catch('Customer not exist', code='026')
+        return APIHandler.catch('Shopping cart clear', code='027')

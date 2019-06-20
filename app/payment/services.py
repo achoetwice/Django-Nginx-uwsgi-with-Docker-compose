@@ -1259,3 +1259,17 @@ def GET_CUSTOMER_LEARNER_PROFILE(shoppingcart_id):
         }
         learners.append(learner_info)
     return learners
+
+def CLEAN_SHOPPINGCART(customer_id):
+    try:
+        customer = CustomerInfos.objects.get(id = customer_id)
+    except:
+        return False
+        
+    shopping_cart = ShoppingCarts.objects.filter(customer_id = customer_id)
+    if len(shopping_cart) == 0:
+        return True
+    else:
+        for item in shopping_cart:
+            item.delete()
+        return True
