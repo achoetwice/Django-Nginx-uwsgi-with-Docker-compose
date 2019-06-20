@@ -171,7 +171,7 @@ def LEJ2_NEWEBPAY(customer_id):
     for shopping_cart_info in customer_cart_items:
         schedule_id = shopping_cart_info.schedule_id
         class_info = GetClassInfo(schedule_id)
-        item_name += class_info['option_name'] + ' '
+        item_name += class_info['option_name'] + ','
     customer_info = CustomerInfos.objects.get(id= customer_id)
 
     # Better Use environment variable instead
@@ -717,15 +717,22 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
 
 
 @transaction.atomic
-def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_decrypt_data=None):
-    shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
-    schedule_id = shopping_cart_info['schedule_id']
-    learners = shopping_cart_info['learners']
-    coupon_infos = shopping_cart_info['coupon_infos']
+def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decrypt_data=None):
+    customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
+    customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+    customer_info = CustomerInfos.objects.get(id= customer_id)
+    sub_total = int(customer_cart_sum.ground_total)
+
+    # shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
+    # schedule_id = shopping_cart_info['schedule_id']
+    # learners = shopping_cart_info['learners']
+    # coupon_infos = shopping_cart_info['coupon_infos']
     
-    customer_info = CustomerInfos.objects.get(id= shopping_cart_info['customer_id'])
-    class_info = GetClassInfo(schedule_id)
-    learners_count = len(learners)
+    # customer_info = CustomerInfos.objects.get(id= shopping_cart_info['customer_id'])
+    # class_info = GetClassInfo(schedule_id)
+    # learners_count = len(learners)
+    '''
+    for shopping_cart_info in customer_cart_items:
 
     try:
         with transaction.atomic():
@@ -746,7 +753,7 @@ def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_
     lock = Update_Vacancy(schedule_id, learner_count)
     if not lock:
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
-
+    '''
     # Update transaction
     new_transaction = Transaction()
     data = {}
@@ -755,24 +762,24 @@ def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_
     last_trans_no = last_trans.transaction_no
     new_transaction_number = GetNewTransNo(last_trans_no)
     data['transaction_no'] = new_transaction_number
-    data['customer_id'] = shopping_cart_info['customer_id']
-    data['ecredits_price'] = 0
+    data['customer_id'] = customer_id
+    data['ecredits_price'] = customer_cart_sum.used_ecredits
     # data['guest_id'] = temp_info.guest_id
-    data['price_prefix'] = class_info['price_prefix']
+    data['price_prefix'] = customer_cart_sum.price_prefix
 
-    data['class_count'] = 1
+    data['class_count'] = len(customer_cart_items)
     # To add device_type from platform or not, it's a question
     # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS'}
-    data['device_type'] = 4
-    if coupon_infos:
-        data['lejcoupon_id'] = coupon_infos.id
-        data['lejcoupon_code'] = coupon_infos.school_coupon_code
-    data['lej_coupon_price'] = shopping_cart_info['coupon_amount']
+    data['device_type'] = customer_info.device_type
+    # 我哩咧在transaction內的coupon資訊是廢欄位
+    # data['lejcoupon_id'] = coupon_infos.id
+    # data['lejcoupon_code'] = coupon_infos.school_coupon_code
+    # data['lej_coupon_price'] = shopping_cart_info['coupon_amount']
     data['total_price'] = sub_total
-    data['other_amount'] = shopping_cart_info['other_amount']
+    data['other_amount'] = customer_cart_sum.other_amount
     # stripe_charge_id = models.CharField(max_length=255, blank=True, null=True)
     if credict_return_data == 'NEWEBPAY':
-        data['newebpay_merchant_trade_no'] = shoppingcart_id
+        data['newebpay_merchant_trade_no'] = customer_cart_sum.id
     elif type(credict_return_data) is dict :
         data['ecpay_merchant_trade_no'] = credict_return_data['MerchantTradeNo']
     
@@ -782,144 +789,162 @@ def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_
     new_transaction.save()
     # print ('uuid', str(uuid.uuid4()))
 
-    # Update_Transaction_item
-    new_transaction_item = TransactionItems()
-    item_data = {}
-    # Update transaction no in item
-    vendorCountryCode = country_list.country_code_alpha3
-    vendor_code = vendor.vendor_code
-    branchCode = VendorBranches.objects.get(pk = branch.branch_id).branch_code
-    code_prefix = vendorCountryCode + vendor_code + branchCode
-    last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
-    
-    if last_trans_item:
-        last_trans_item = last_trans_item[0]
-        # print ('last_trans_item', last_trans_item.booking_no)
-        last_trans_item_no = last_trans_item.booking_no.replace(code_prefix, '')
-        new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
-        item_data['booking_no'] = code_prefix + new_trans_item_no
-    else:
-        last_trans_item_no = '000000000'
-        new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
-        item_data['booking_no'] = code_prefix + new_trans_item_no
-    item_data['transaction_id'] = new_transaction.pk
-    item_data['booking_class_id'] = class_info['class_id']
-    item_data['booking_schedule_id'] = schedule_id
-    item_data['vendor_id'] = class_info['vendor_id']
-    item_data['vendor_branch_id'] = class_info['branch_id']
-    item_data['class_name'] = class_info['class_name']
-    item_data['option_name'] = class_info['option_name']
-    item_data['schedule_name'] = class_info['schedule_name']
-    item_data['vendor_name'] = class_info['vendor_name']
-    # item_data['school_coupon_id'] = 'NULL'
-    # item_data['school_coupon_code'] = 'NULL'
-    item_data['original_price'] = sub_total
-    item_data['register_price'] = 0
-    item_data['school_coupon_price'] = 0
-    item_data['merchandise_price'] = 0
-    item_data['total_price'] = sub_total
-    # item_data['special_note'] = ''
-    item_data['branch_address'] = class_info['address']
-    item_data['branch_name'] = class_info['branch_name']
-    item_data['age_min'] = classes.age_min
-    item_data['age_max'] = classes.age_max
-    item_data['learner_count'] = learners_count
-    item_data['class_date'] = class_info['schedule_name']
-    item_data['class_time'] = schedule.start_time + '-' + schedule.end_time
-    item_data['redeem'] = 0
-    item_data['confirm'] = 0
-    item_data['price_prefix'] = class_info['price_prefix']
-    # item_data['special_name'] = ''
-    # item_data['special_discount'] = ''
-    for key,value in item_data.items():
-        setattr(new_transaction_item, key, value)
-    new_transaction_item.save()
+    # Update_Transaction_item for each class
+    for cart_item in customer_cart_items:
+        new_transaction_item = TransactionItems.objects.create(id =str(uuid.uuid4())[0:30], original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
+        total_price=0, redeem=0, confirm=0, date_added=timezone.now(), branch_name='0')
+        item_data = {}
+        schedule_id = cart_item.schedule_id
 
-    # Update booking_class
-    new_booking_class = BookingClasses()
-    book_data = {}
-    book_data['transaction_item_id'] = new_transaction_item.pk
-    book_data['class_name'] = class_info['class_name']
-    book_data['vendor_id'] = class_info['vendor_id']
-    book_data['description'] = classes.description
-    book_data['age_min'] = classes.age_min
-    book_data['age_max'] = classes.age_max
-    book_data['cover_image'] = classes.cover_image
-    # book_data['image_list'] = classes.image_list
-    book_data['youtube_code'] = classes.youtube_code
-    book_data['teaching_type_1'] = classes.teaching_type_1
-    book_data['teaching_type_2'] = classes.teaching_type_2
-    book_data['teaching_type_3'] = classes.teaching_type_3
-    book_data['teaching_type_4'] = classes.teaching_type_4
-    book_data['teaching_type_5'] = classes.teaching_type_5
-    book_data['teaching_type_6'] = classes.teaching_type_6
-    book_data['teaching_type_7'] = classes.teaching_type_7
-    book_data['teaching_type_8'] = classes.teaching_type_8
-    book_data['comment_status'] = classes.comment_status
-    book_data['view_count'] = classes.view_count
-    book_data['ad_paid'] = classes.ad_paid
-    book_data['start_date'] = schedule.start_date
-    book_data['end_date'] = schedule.end_date
-    for key,value in book_data.items():
-        setattr(new_booking_class, key, value)
-    new_booking_class.save()
+        # collect informations
+        shoppingcart_id = cart_item.id
+        learners = GET_CUSTOMER_LEARNER_PROFILE(shoppingcart_id)
+        learners_count = len(learners)
+        try:
+            with transaction.atomic():
+                schedule = ClassSchedules.objects.get(pk= schedule_id)
+        except ObjectDoesNotExist:
+            return '006'
+        option = schedule.option
+        branch = option.branch
+        classes = branch.classes
+        vendor = classes.vendor
+        class_info = GetClassInfo(schedule_id)
+        country_list = CountryLists.objects.get(country_name = vendor.vendor_country)
 
-    # Update branch history
-    new_branch_history = BranchHistories()
-    hist_data = {}
-    hist_data['booking_class_id'] = new_booking_class.pk
-    hist_data['class_branch'] = branch.class_branch
-    hist_data['class_id'] = branch.classes.pk
-    hist_data['country'] = branch.country
-    hist_data['city'] = branch.city
-    hist_data['address'] = branch.address
-    hist_data['latitude'] = branch.latitude
-    hist_data['longitude'] = branch.longitude
-    for key,value in hist_data.items():
-        setattr(new_branch_history, key, value)
-    new_branch_history.save()
+        # pre-calculate
+        original_price = Decimal(cart_item.coupon_amount) + Decimal(cart_item.subtotal)
+        total_price = Decimal(cart_item.subtotal)
 
-    temp_learners = deepcopy(learners)
-    # print ('WTDDDDDDDDDDDDDDD', temp_learners)
-    
-    # Update transactionItemProfile
-    for learner in temp_learners:
-        print ('learner format', learner)
-        prof_data = {}
-        new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
-        # print ('new_transactionitem_profile', new_transactionitem_profile)
-        prof_data['transaction_item_id'] = new_transaction_item.pk
-        prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
-        prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
-        # print ('learner[profile_dob]', learner['profile_dob'])
-        if learner.get('profile_dob', None):
-            try:
-                with transaction.atomic():
-                    learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y/%m/%d').date()
-                    print ('change format 1')
-            except ValueError:
-                learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y-%m-%d').date()
-                print ('change format 2')
-            except:
-                prof_data['profile_dob'] = learner['profile_dob']
-                print ('change format 3')
-                # return '013'
-        # print ('learner[profile_dob] after', learner['profile_dob'])
-        prof_data['profile_dob'] = learner['profile_dob']
-        # print ('end of learner dob')
-        prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
-        print ('end of learner note')
-        for key,value in prof_data.items():
-            print ('key, value', key, ',', value)
-            setattr(new_transactionitem_profile, key, value)
-        new_transactionitem_profile.save()
-    
-    # Get shopping cart info, send mail, then delete
-    shopping_cart = ShoppingCarts.objects.get(id = shoppingcart_id)
-    shopping_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = shopping_cart.customer_id).order_by('-date_added')
-    learner_profiles = ShoppingcartProfiles.objects.filter(shoppingcart_id = shoppingcart_id)
-    
+        # Update transaction no in item
+        vendorCountryCode = country_list.country_code_alpha3
+        vendor_code = vendor.vendor_code
+        branchCode = VendorBranches.objects.get(pk = branch.branch_id).branch_code
+        code_prefix = vendorCountryCode + vendor_code + branchCode
+        last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
+        
+        if last_trans_item:
+            last_trans_item = last_trans_item[0]
+            # print ('last_trans_item', last_trans_item.booking_no)
+            last_trans_item_no = last_trans_item.booking_no.replace(code_prefix, '')
+            new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
+            item_data['booking_no'] = code_prefix + new_trans_item_no
+        else:
+            last_trans_item_no = '000000000'
+            new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
+            item_data['booking_no'] = code_prefix + new_trans_item_no
+        item_data['transaction_id'] = new_transaction.pk
+        item_data['booking_class_id'] = class_info['class_id']
+        item_data['booking_schedule_id'] = schedule_id
+        item_data['vendor_id'] = class_info['vendor_id']
+        item_data['vendor_branch_id'] = class_info['branch_id']
+        item_data['class_name'] = class_info['class_name']
+        item_data['option_name'] = class_info['option_name']
+        item_data['schedule_name'] = class_info['schedule_name']
+        item_data['vendor_name'] = class_info['vendor_name']
+        # item_data['school_coupon_id'] = 'NULL'
+        # item_data['school_coupon_code'] = 'NULL'
+        item_data['original_price'] = original_price
+        item_data['register_price'] = 0
+        item_data['school_coupon_price'] = Decimal(cart_item.coupon_amount)
+        item_data['merchandise_price'] = 0
+        item_data['total_price'] = total_price
+        # item_data['special_note'] = ''
+        item_data['branch_address'] = class_info['address']
+        item_data['branch_name'] = class_info['branch_name']
+        item_data['age_min'] = classes.age_min
+        item_data['age_max'] = classes.age_max
+        item_data['learner_count'] = learners_count
+        item_data['class_date'] = class_info['schedule_name']
+        item_data['class_time'] = schedule.start_time + '-' + schedule.end_time
+        item_data['redeem'] = 0
+        item_data['confirm'] = 0
+        item_data['price_prefix'] = class_info['price_prefix']
+        # item_data['special_name'] = ''
+        # item_data['special_discount'] = ''
+        for key,value in item_data.items():
+            setattr(new_transaction_item, key, value)
+        new_transaction_item.save()
 
+        # Update booking_class
+        new_booking_class = BookingClasses()
+        book_data = {}
+        book_data['transaction_item_id'] = new_transaction_item.pk
+        book_data['class_name'] = class_info['class_name']
+        book_data['vendor_id'] = class_info['vendor_id']
+        book_data['description'] = classes.description
+        book_data['age_min'] = classes.age_min
+        book_data['age_max'] = classes.age_max
+        book_data['cover_image'] = classes.cover_image
+        # book_data['image_list'] = classes.image_list
+        book_data['youtube_code'] = classes.youtube_code
+        book_data['teaching_type_1'] = classes.teaching_type_1
+        book_data['teaching_type_2'] = classes.teaching_type_2
+        book_data['teaching_type_3'] = classes.teaching_type_3
+        book_data['teaching_type_4'] = classes.teaching_type_4
+        book_data['teaching_type_5'] = classes.teaching_type_5
+        book_data['teaching_type_6'] = classes.teaching_type_6
+        book_data['teaching_type_7'] = classes.teaching_type_7
+        book_data['teaching_type_8'] = classes.teaching_type_8
+        book_data['comment_status'] = classes.comment_status
+        book_data['view_count'] = classes.view_count
+        book_data['ad_paid'] = classes.ad_paid
+        book_data['start_date'] = schedule.start_date
+        book_data['end_date'] = schedule.end_date
+        for key,value in book_data.items():
+            setattr(new_booking_class, key, value)
+        new_booking_class.save()
+
+        # Update branch history
+        new_branch_history = BranchHistories()
+        hist_data = {}
+        hist_data['booking_class_id'] = new_booking_class.pk
+        hist_data['class_branch'] = branch.class_branch
+        hist_data['class_id'] = branch.classes.pk
+        hist_data['country'] = branch.country
+        hist_data['city'] = branch.city
+        hist_data['address'] = branch.address
+        hist_data['latitude'] = branch.latitude
+        hist_data['longitude'] = branch.longitude
+        for key,value in hist_data.items():
+            setattr(new_branch_history, key, value)
+        new_branch_history.save()
+
+        temp_learners = deepcopy(learners)
+        # print ('WTDDDDDDDDDDDDDDD', temp_learners)
+    
+        # Update transactionItemProfile
+        for learner in temp_learners:
+            print ('learner format', learner)
+            prof_data = {}
+            new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
+            # print ('new_transactionitem_profile', new_transactionitem_profile)
+            prof_data['transaction_item_id'] = new_transaction_item.pk
+            prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
+            prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
+            # print ('learner[profile_dob]', learner['profile_dob'])
+            if learner.get('profile_dob', None):
+                try:
+                    with transaction.atomic():
+                        learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y/%m/%d').date()
+                        print ('change format 1')
+                except ValueError:
+                    learner['profile_dob'] = datetime.strptime(learner['profile_dob'], '%Y-%m-%d').date()
+                    print ('change format 2')
+                except:
+                    prof_data['profile_dob'] = learner['profile_dob']
+                    print ('change format 3')
+                    # return '013'
+            # print ('learner[profile_dob] after', learner['profile_dob'])
+            prof_data['profile_dob'] = learner['profile_dob']
+            # print ('end of learner dob')
+            prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
+            print ('end of learner note')
+            for key,value in prof_data.items():
+                print ('key, value', key, ',', value)
+                setattr(new_transactionitem_profile, key, value)
+            new_transactionitem_profile.save()
+   
     # Send email to both customer and partner if Transaction done
     for learner in learners:
         if isinstance(learner['profile_dob'], date):
@@ -956,9 +981,17 @@ def Update_LEJ2_Transaction(shoppingcart_id, credict_return_data=None, newebpay_
     elif not partner_mail_send['code'] == '005000':
         return partner_mail_send
     else:
-        shopping_cart.delete()
-        shopping_cart_sum.delete()
-        learner_profiles.delete()
+        # Get shopping cart info, send mail, then delete
+        shopping_carts = ShoppingCarts.objects.filter(customer_id = customer_id)
+        shopping_cart_sums = ShoppingcartSummaries.objects.filter(customer_id = customer_id)
+        for shopping_cart in shopping_carts:
+            shoppingcart_id = shopping_cart.id
+            learner_profiles = ShoppingcartProfiles.objects.filter(shoppingcart_id = shoppingcart_id)
+            for learner_profile in learner_profiles:
+                learner_profile.delete()
+            shopping_cart.delete()
+        for shopping_cart_sum in shopping_cart_sums:
+            shopping_cart_sum.delete()
         return '014'
 
 @transaction.atomic
@@ -982,10 +1015,10 @@ def Update_Free_Transaction(temp_id, schedule_id, learners):
         return '017'
 
 @transaction.atomic
-def Update_Free_LEJ2_Transaction(shoppingcart_id):
+def Update_Free_LEJ2_Transaction(customer_id):
     # Get payment informations
     # Start transaction to transactions
-    trans = Update_LEJ2_Transaction(shoppingcart_id)
+    trans = Update_LEJ2_Transaction(customer_id)
     if trans == '006':
         return '006'
     elif trans == '013':
@@ -1201,5 +1234,28 @@ def GET_CUSTOMER_CART_ITEMS(customer_id):
     return customer_cart_items
 
 def GET_CUSTOMER_CART_SUM(customer_id):
-    customer_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = customer_id).order_by('-date_added')[0]
+    customer_cart_sum = ShoppingcartSummaries.objects.filter(customer_id = customer_id).order_by('-date_added')
+    try:
+        customer_cart_sum = customer_cart_sum[0]
+    except Exception as e:
+        return False
     return customer_cart_sum
+
+def GET_CUSTOMERID_BY_SUMID(shoppingcart_summary_id):
+    try:
+        customer_id = ShoppingcartSummaries.objects.get(id = shoppingcart_summary_id).customer_id
+    except:
+        return False
+    return customer_id
+
+def GET_CUSTOMER_LEARNER_PROFILE(shoppingcart_id):
+    learner_profiles = ShoppingcartProfiles.objects.filter(shoppingcart_id = shoppingcart_id)
+    learners = []
+    for learner in learner_profiles:
+        learner_info = {
+            'profile_name': learner.profile_name,
+            'profile_dob': learner.profile_dob,
+            'profile_note': learner.profile_note
+        }
+        learners.append(learner_info)
+    return learners

@@ -153,10 +153,13 @@ class NEWEBPAY_LEJ2_ReturnData(APIView):
         print ('newebpay_data', data)
         decrypt_data = NEWEBPAY_Decrypt(data['TradeInfo'])
         print ('dec newebpay_data', decrypt_data)
-        shoppingcart_id = decrypt_data['Result']['MerchantOrderNo']
-        print ('shoppingcart_id', shoppingcart_id)
+        shoppingcart_summary_id = decrypt_data['Result']['MerchantOrderNo']
+        customer_id = GET_CUSTOMERID_BY_SUMID(shoppingcart_summary_id)
+        if not customer_id:
+            return APIHandler.catch('Missing shopping cart informations', code='022')
+        print ('shoppingcart_id', customer_id)
         if data['Status'] != 'SUCCESS':
-            logger.error (f'Fail to charge with credit card, transaction number(shoppingcart_id) {shoppingcart_id}')
+            logger.error (f'Fail to charge with credit card, transaction number(customer_id) {customer_id}')
             return APIHandler.catch('Newebpay Fail to charge', code='023')
 
         # Get credict_return_data
@@ -164,7 +167,7 @@ class NEWEBPAY_LEJ2_ReturnData(APIView):
         # Todo here: check credict card record in newebpay
         
         # Start transaction to transactions
-        trans = Update_LEJ2_Transaction(shoppingcart_id, credict_return_data, newebpay_decrypt_data=decrypt_data['Result'])
+        trans = Update_LEJ2_Transaction(customer_id, credict_return_data, newebpay_decrypt_data=decrypt_data['Result'])
         if trans == '006':
             return APIHandler.catch('Schedule not exist', code='006')
         elif trans == '013':
@@ -424,7 +427,8 @@ class LEJ2_Url_CustomerPaynow(APIView):
         if not customer_id:
             return APIHandler.catch('Please provide customer_id', code='003')
         customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
-        if customer_cart_items.count == 0:
+        customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+        if customer_cart_items.count == 0 or not customer_cart_sum:
             return APIHandler.catch('No class in customer\'s cart', code='024')
 
         cart_price = 0
