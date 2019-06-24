@@ -142,6 +142,7 @@ def NEWEBPAY(schedule_id, learners, guest_id, temp_id):
     
 
     data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
         'MerchantID':MerchantID,
         'TradeInfo':AES_info_str,
         'TradeSha':SHA_info_STR,
@@ -212,6 +213,7 @@ def LEJ2_NEWEBPAY(customer_id):
     
 
     data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
         'MerchantID':MerchantID,
         'TradeInfo':AES_info_str,
         'TradeSha':SHA_info_STR,
@@ -1220,8 +1222,8 @@ def GET_SHOPPINGCART_INFOS(shoppingcart_id):
         'learners': learners,
         'schedule_id': schedule_id,
         'customer_id': customer_id,
-        'ground_total': shopping_cart_sum[0].ground_total,
-        'other_amount': shopping_cart_sum[0].other_amount,
+        # 'ground_total': shopping_cart_sum[0].ground_total,
+        # 'other_amount': shopping_cart_sum[0].other_amount,
         'coupon_infos': coupon_infos,
         'coupon_amount': shopping_cart.coupon_amount,
     }

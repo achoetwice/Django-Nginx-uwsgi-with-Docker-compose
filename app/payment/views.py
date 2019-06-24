@@ -427,8 +427,9 @@ class LEJ2_Url_CustomerPaynow(APIView):
         if not customer_id:
             return APIHandler.catch('Please provide customer_id', code='003')
         customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
-        customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
-        if customer_cart_items.count == 0 or not customer_cart_sum:
+        # customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+        # print('customer_cart_sum', customer_cart_sum)
+        if customer_cart_items.count == 0:
             return APIHandler.catch('No class in customer\'s cart', code='024')
 
         cart_price = 0

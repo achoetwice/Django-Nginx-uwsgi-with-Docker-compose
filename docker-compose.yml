@@ -18,6 +18,6 @@ services:
       - ./conf.d/nginx.conf:/etc/nginx/conf.d/nginx.conf
       - ./app:/app
     ports:
-      - "8011:8000"
+      - "${PORT}:8000"
     links:
       - api
