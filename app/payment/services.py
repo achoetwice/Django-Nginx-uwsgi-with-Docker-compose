@@ -1167,6 +1167,14 @@ def GetTransactionNumber(temp_id):
         return False
     return trans_no
 
+def GetTransactionID(temp_id):
+    # Use temp id to get transaction number in Transaction
+    try:
+        trans_id = Transaction.objects.get(newebpay_merchant_trade_no = temp_id).id
+    except:
+        return False
+    return trans_id
+
 def GetLineTransactions(line_id):
     try:
         trans_infos = Transaction.objects.filter(line_id = line_id).order_by('-transaction_no')

@@ -503,10 +503,11 @@ class GetTransactionNo(APIView):
         if not temp_id:
             return APIHandler.catch('Please provide temp_id', code='003')
         trans_no = GetTransactionNumber(temp_id)
+        trans_id = GetTransactionID(temp_id)
         if not trans_no:
             return APIHandler.catch('Transaction not found', code='021')
         else:
-            return APIHandler.catch(data={'transaction_no': trans_no}, code='000')
+            return APIHandler.catch(data={'transaction_no':trans_no, 'transaction_id':trans_id}, code='000')
 
 class LinePaymentHistory(APIView):
     def get(self, request):
