@@ -10,21 +10,21 @@ class Migration(migrations.Migration):
     ]
 
     operations = [
-        migrations.AddField(
-            model_name='transaction',
-            name='ecpay_merchant_trade_no',
-            field=models.CharField(blank=True, max_length=255, null=True),
-        ),
-        migrations.AddField(
-            model_name='transaction',
-            name='newebpay_merchant_trade_no',
-            field=models.CharField(blank=True, max_length=255, null=True),
-        ),
-        migrations.AddField(
-            model_name='transaction',
-            name='other_amount',
-            field=models.FloatField(default=0),
-        ),
+    #     migrations.AddField(
+    #         model_name='transaction',
+    #         name='ecpay_merchant_trade_no',
+    #         field=models.CharField(blank=True, max_length=255, null=True),
+    #     ),
+    #     migrations.AddField(
+    #         model_name='transaction',
+    #         name='newebpay_merchant_trade_no',
+    #         field=models.CharField(blank=True, max_length=255, null=True),
+    #     ),
+    #     migrations.AddField(
+    #         model_name='transaction',
+    #         name='other_amount',
+    #         field=models.FloatField(default=0),
+    #     ),
         migrations.AlterField(
             model_name='guesttemporaryinfo',
             name='id',
