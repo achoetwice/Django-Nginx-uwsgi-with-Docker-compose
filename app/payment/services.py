@@ -30,7 +30,7 @@ def GetGuestTempInfo (temp_id):
     try:
         temp_info = GuestTemporaryInfo.objects.get(id = temp_id)
     except ObjectDoesNotExist:
-        return ('')
+        return False
     return temp_info
 
 def GetClassInfo(schedule_id):
@@ -223,6 +223,54 @@ def LEJ2_NEWEBPAY(customer_id):
     # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
     # dec = dec['Result']['MerchantOrderNo']
     # print ('decrypt', dec)
+
+    return data
+
+def PREMIUM_NEWEBPAY(premiun_price, customer_id):
+    # Better Use environment variable instead
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+    MerchantOrderNo = datetime.now().strftime("PREMIUM%Y%m%d%H%M%S")
+    order_params = {
+        'MerchantID': MerchantID,
+        'RespondType': 'JSON',
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.5',
+        'LangType': 'zh-tw',
+        'MerchantOrderNo': MerchantOrderNo,
+        'Amt': premiun_price,
+        'ItemDesc': 'Premium privilege',
+        'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
+        # 'ExpireDate': None,
+        # 'ReturnURL': None, # 引導消費者返回商店
+        'NotifyURL': public_url + '/payment/newebpay_return_premium_data/', # 接收交易資訊
+        # 'CustomerURL': None,
+        # 'ClientBackURL': None, # 交易取消要去哪
+        'Email':customer_info.customer_email, # 交易完成通知付款人（0.0）醬方便阿
+        'EmailModify': 0,
+        'LoginType': 0,
+        # 'OrderComment': f'{id_dict}',
+        'CREDIT': 1,
+        # 'InstFlag': 0, # 分期功能
+    }
+    print ('order_params', order_params)
+    
+    # AES encode 
+    AES_info_str = NEWEBPAY_AES(order_params, key, iv)
+
+    # SHA256 encode
+    AES_plus = 'HashKey=' + key + '&' + AES_info_str + '&' + 'HashIV=' + iv
+    SHA_info_STR = NEWEBPAY_SHA(AES_plus)
+    
+
+    data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
+        'MerchantID':MerchantID,
+        'TradeInfo':AES_info_str,
+        'TradeSha':SHA_info_STR,
+        'Version':'1.5'
+    }
 
     return data
 
