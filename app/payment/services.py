@@ -516,7 +516,7 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
 
     # Update transaction
-    new_transaction = Transaction.objects.create(transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
+    new_transaction = Transaction.objects.create(id=str(uuid.uuid4())[0:30], transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
     date_added=timezone.now(),device_type=0,other_amount=0)
     data = {}
     last_trans = Transaction.objects.latest('transaction_no')
@@ -548,7 +548,7 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     # print ('uuid', str(uuid.uuid4()))
 
     # Update_Transaction_item
-    new_transaction_item = TransactionItems.objects.create(original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
+    new_transaction_item = TransactionItems.objects.create(id =str(uuid.uuid4())[0:30], original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
     total_price=0, redeem=0, confirm=0, date_added=timezone.now(), branch_name='0')
     item_data = {}
     # Update transaction no in item
@@ -759,7 +759,7 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
     '''
     # Update transaction
-    new_transaction = Transaction.objects.create(transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
+    new_transaction = Transaction.objects.create(id=str(uuid.uuid4())[0:30], transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
     date_added=timezone.now(),device_type=0,other_amount=0)
     data = {}
     last_trans = Transaction.objects.latest('transaction_no')
