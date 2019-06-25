@@ -655,6 +655,7 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         # print ('new_transactionitem_profile', new_transactionitem_profile)
         prof_data['transaction_item_id'] = new_transaction_item.pk
         prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
+        print('learner[profile_name]~~~~~~~~~~', learner['profile_name'])
         prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
         # print ('learner[profile_dob]', learner['profile_dob'])
         if learner.get('profile_dob', None):
