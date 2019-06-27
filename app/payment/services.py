@@ -1,6 +1,6 @@
 from .models import ClassSchedules, ClassOptions, ClassBranches, VendorClasses, VendorInfos, Transaction, GuestInfos, \
 CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo, TransactionCounterPay, \
-ShoppingCarts, ShoppingcartProfiles, ShoppingcartSummaries, CustomerInfos, SchoolCouponInfos
+ShoppingCarts, ShoppingcartProfiles, ShoppingcartSummaries, CustomerInfos, SchoolCouponInfos, ShoppingcartPremium
 from payment.serializers import *
 from helper.helper import APIHandler
 from datetime import datetime, date
@@ -19,9 +19,12 @@ logger = logging.getLogger('django.request')
 
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
+public_url_account = os.getenv('public_url_account')
+account_token = os.getenv('account_token')
 
 def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id):
-    New_temp_info = GuestTemporaryInfo.objects.create(id =str(uuid.uuid4())[0:8], email = email, first_name = first_name, last_name = last_name, mobile = customer_mobile, \
+    ID = UNIQUE_ID_GENERATOR(GuestTemporaryInfo, number=8)
+    New_temp_info = GuestTemporaryInfo.objects.create(id =ID, email = email, first_name = first_name, last_name = last_name, mobile = customer_mobile, \
     learners = learners, schedule_id = schedule_id, auto_create_account = auto_create_account, guest_id = guest_id, line_id = line_id)
     New_temp_info.save()
     return New_temp_info.id
@@ -226,12 +229,24 @@ def LEJ2_NEWEBPAY(customer_id):
 
     return data
 
-def PREMIUM_NEWEBPAY(premiun_price, customer_id):
+def PREMIUM_NEWEBPAY(merchant_order_no):
     # Better Use environment variable instead
+
     MerchantID = os.getenv('MERCHANT_ID')
     key = os.getenv('NEWEBPAY_KEY')
     iv = os.getenv('NEWEBPAY_IV')
-    MerchantOrderNo = datetime.now().strftime("PREMIUM%Y%m%d%H%M%S")
+    try:
+        premium_cart = ShoppingcartPremium.objects.get(merchant_order_no=merchant_order_no)
+    except:
+        return False
+    MerchantOrderNo = premium_cart.merchant_order_no
+    premium_price = int(premium_cart.premium_price)
+    service_customer_id = premium_cart.service_customer_id
+
+    response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
+    Email = json.loads(response.content)['data']['email']
+    print ("Email", Email)
+
     order_params = {
         'MerchantID': MerchantID,
         'RespondType': 'JSON',
@@ -239,15 +254,16 @@ def PREMIUM_NEWEBPAY(premiun_price, customer_id):
         'Version': '1.5',
         'LangType': 'zh-tw',
         'MerchantOrderNo': MerchantOrderNo,
-        'Amt': premiun_price,
-        'ItemDesc': 'Premium privilege',
+        'Amt': premium_price,
+        'ItemDesc': '特約會員優惠',
         'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
         # 'ExpireDate': None,
         # 'ReturnURL': None, # 引導消費者返回商店
         'NotifyURL': public_url + '/payment/newebpay_return_premium_data/', # 接收交易資訊
         # 'CustomerURL': None,
         # 'ClientBackURL': None, # 交易取消要去哪
-        'Email':customer_info.customer_email, # 交易完成通知付款人（0.0）醬方便阿
+        # 'Email':Email, # 交易完成通知付款人（0.0）醬方便阿
+        'Email': 'adamlin@rd.edallianz.com',
         'EmailModify': 0,
         'LoginType': 0,
         # 'OrderComment': f'{id_dict}',
@@ -450,7 +466,7 @@ def Update_Vacancy(schedule_id, learner_count):
         return True
 
 def GetNewTransNo(last_trans_no):
-    last_trans_no.strip('C')
+    last_trans_no = last_trans_no.strip('C')
     if not last_trans_no:
         today_y = int(str(date.today().year)[2:4])
         today_m = date.today().month
@@ -564,7 +580,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
 
     # Update transaction
-    new_transaction = Transaction.objects.create(id=str(uuid.uuid4())[0:30], transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
+    ID = UNIQUE_ID_GENERATOR(Transaction)
+    new_transaction = Transaction.objects.create(id=ID, transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
     date_added=timezone.now(),device_type=0,other_amount=0)
     data = {}
     last_trans = Transaction.objects.latest('transaction_no')
@@ -596,7 +613,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     # print ('uuid', str(uuid.uuid4()))
 
     # Update_Transaction_item
-    new_transaction_item = TransactionItems.objects.create(id =str(uuid.uuid4())[0:30], original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
+    ID = UNIQUE_ID_GENERATOR(TransactionItems)
+    new_transaction_item = TransactionItems.objects.create(id =ID, original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
     total_price=0, redeem=0, confirm=0, date_added=timezone.now(), branch_name='0')
     item_data = {}
     # Update transaction no in item
@@ -699,7 +717,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     # Update transactionItemProfile
     for learner in temp_learners:
         prof_data = {}
-        new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
+        ID = UNIQUE_ID_GENERATOR(TransactionItemProfiles)
+        new_transactionitem_profile = TransactionItemProfiles.objects.create(id =ID, profile_dob = timezone.now())
         # print ('new_transactionitem_profile', new_transactionitem_profile)
         prof_data['transaction_item_id'] = new_transaction_item.pk
         prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
@@ -776,14 +795,6 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     customer_info = CustomerInfos.objects.get(id= customer_id)
     sub_total = int(customer_cart_sum.ground_total)
 
-    # shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
-    # schedule_id = shopping_cart_info['schedule_id']
-    # learners = shopping_cart_info['learners']
-    # coupon_infos = shopping_cart_info['coupon_infos']
-    
-    # customer_info = CustomerInfos.objects.get(id= shopping_cart_info['customer_id'])
-    # class_info = GetClassInfo(schedule_id)
-    # learners_count = len(learners)
     '''
     for shopping_cart_info in customer_cart_items:
 
@@ -808,7 +819,8 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         return APIHandler.catch('Vacancy not enough or schedule error', code='012')
     '''
     # Update transaction
-    new_transaction = Transaction.objects.create(id=str(uuid.uuid4())[0:30], transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
+    ID = UNIQUE_ID_GENERATOR(Transaction)
+    new_transaction = Transaction.objects.create(id=ID, transaction_no='', customer_id='',price_prefix='TWD',total_price=0,class_count='',\
     date_added=timezone.now(),device_type=0,other_amount=0)
     data = {}
     last_trans = Transaction.objects.latest('transaction_no')
@@ -845,7 +857,8 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
 
     # Update_Transaction_item for each class
     for cart_item in customer_cart_items:
-        new_transaction_item = TransactionItems.objects.create(id =str(uuid.uuid4())[0:30], original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
+        ID = UNIQUE_ID_GENERATOR(TransactionItems)
+        new_transaction_item = TransactionItems.objects.create(id =ID, original_price=0, register_price=0,school_coupon_price=0,merchandise_price=0,\
         total_price=0, redeem=0, confirm=0, date_added=timezone.now(), branch_name='0')
         item_data = {}
         schedule_id = cart_item.schedule_id
@@ -971,7 +984,8 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         for learner in temp_learners:
             print ('learner format', learner)
             prof_data = {}
-            new_transactionitem_profile = TransactionItemProfiles.objects.create(id =str(uuid.uuid4())[0:30], profile_dob = timezone.now())
+            ID = UNIQUE_ID_GENERATOR(TransactionItemProfiles)
+            new_transactionitem_profile = TransactionItemProfiles.objects.create(id =ID, profile_dob = timezone.now())
             # print ('new_transactionitem_profile', new_transactionitem_profile)
             prof_data['transaction_item_id'] = new_transaction_item.pk
             prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
@@ -1047,6 +1061,35 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         for shopping_cart_sum in shopping_cart_sums:
             shopping_cart_sum.delete()
         return '014'
+
+@transaction.atomic
+def UPDATE_PREMIUM_TRANSACTION(merchant_order_no):
+
+    try:
+        premium_cart = ShoppingcartPremium.objects.filter(merchant_order_no=merchant_order_no).order_by('-date_added')[0]
+    except:
+        return False
+    ID = UNIQUE_ID_GENERATOR(Transaction)
+    last_trans = Transaction.objects.latest('transaction_no')
+    last_trans_no = last_trans.transaction_no
+    new_transaction_number = GetNewTransNo(last_trans_no)
+    premium_info = GET_PREMIUM_INFO(merchant_order_no)
+
+    new_transaction = Transaction.objects.create(
+        id = ID,
+        transaction_no = new_transaction_number,
+        customer_id = premium_info.lej_customer_id,
+        price_prefix = premium_cart.price_prefix,
+        total_price = int(premium_cart.premium_price),
+        class_count = 0,
+        newebpay_merchant_trade_no = merchant_order_no,
+        device_type = premium_cart.device_type
+    )
+
+    premium_info.delete()
+    trans_no = new_transaction.transaction_no
+    return trans_no
+
 
 @transaction.atomic
 def Update_Free_Transaction(temp_id, schedule_id, learners):
@@ -1348,3 +1391,86 @@ def LEJ2_GetTransactionNumber(summary_id):
     except:
         return False
     return trans_no
+
+def STROE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
+    account_info = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
+    account_info = json.loads(account_info.content)['data']
+    lej_customer_id = account_info['lej_id']
+
+    premium_cart = ShoppingcartPremium.objects.create(
+        merchant_order_no = '',
+        service_customer_id = service_customer_id,
+        device_type = 0,
+        premium_price = premium_price,
+        lej_customer_id = lej_customer_id,
+    )
+    premium_cart.merchant_order_no = f'{premium_cart.id }' + datetime.now().strftime("PREMIUM%Y%m%d%H%M%S")
+    premium_cart.save()
+    return premium_cart.merchant_order_no
+
+def GET_PREMIUM_INFO(merchant_order_no):
+    try:
+        service_customer = ShoppingcartPremium.objects.get(merchant_order_no=merchant_order_no)
+    except:
+        return False
+    return service_customer
+
+def CALL_REQUEST(service_type, method, router, data=None, token=None):
+    if service_type == 'account':
+        url = public_url_account + router
+    elif service_type == 'email':
+        url = public_url_sendmail + router
+
+    if token:
+        headers={'Authorization': 'Bearer ' + token}
+
+    if method == 'get':
+        response = requests.get(url, headers=headers, params=data)
+        if response.status_code != 200:
+            return False
+    elif method == 'post':
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code != 200:
+            return False
+    else:
+        response = False
+    print ('responseresponse', response.status_code)
+    return response
+
+
+
+# def CREATE_MULTITRANSACTION():
+#     ID = UNIQUE_ID_GENERATOR(Transaction)
+#     new_1 = Transaction.objects.create(
+#         id=ID,
+#         transaction_no = '1',
+#         customer_id = '1',
+#         price_prefix = '1',
+#         total_price = 1,
+#         class_count = 1,
+#         device_type = '1',
+#         other_amount = 1
+#     )
+
+#     ID = UNIQUE_ID_GENERATOR(Transaction)
+#     new_2 = Transaction.objects.create(
+#         id=ID,
+#         transaction_no = '2',
+#         customer_id = '2',
+#         price_prefix = '2',
+#         total_price = 2,
+#         class_count = 2,
+#         device_type = '2',
+#         other_amount = 2,
+#     )
+
+def UNIQUE_ID_GENERATOR(object, number=30):
+    ID = str(uuid.uuid4())[0:number]
+    try:
+        trans_count = object.objects.filter(id=ID).count()
+        while trans_count>0:
+            ID = str(uuid.uuid4())[0:number]
+            trans_count = object.objects.filter(id=ID).count()
+    except:
+        pass
+    return ID

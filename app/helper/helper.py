@@ -1,6 +1,7 @@
-import random
+import random, string
 # from django.conf import settings
 from rest_framework.response import Response
+
 # class URL:
 #     @staticmethod
 #     def url_ba():

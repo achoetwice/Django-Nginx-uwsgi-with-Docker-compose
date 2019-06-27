@@ -9,7 +9,6 @@ from django.db import models
 import uuid
 from django.utils import timezone
 
-
 class AllowCities(models.Model):
     allow_state_id = models.IntegerField(blank=True, null=True)
     city_name = models.CharField(max_length=100, blank=True, null=True)
@@ -1253,6 +1252,24 @@ class ShoppingcartSummaries(models.Model):
         db_table = 'shoppingcart_summaries'
 
 
+class ShoppingcartPremium(models.Model):
+    merchant_order_no = models.CharField(max_length=50)
+    service_customer_id = models.CharField(max_length=50)
+    price_prefix = models.CharField(max_length=50, default='TWD')
+    lej_customer_id = models.CharField(max_length=50, null=True)
+    premium_price = models.DecimalField(max_digits=15, decimal_places=2, default=0)
+    device_type = models.IntegerField(default=0)
+    date_added = models.DateTimeField(blank=True, null=True)
+
+    def save(self, *args, **kwargs):
+        self.date_added = timezone.now()
+        super(ShoppingcartPremium, self).save(*args, **kwargs)
+
+    class Meta:
+        managed = True
+        db_table = 'shoppingcart_premium'
+
+
 class TopexRef(models.Model):
     # pk = models.CharField(primary_key=True, max_length=30)
     customer_id = models.CharField(max_length=30, blank=True, null=True)
@@ -1270,7 +1287,7 @@ class TopexRef(models.Model):
 
 
 class Transaction(models.Model):
-    id = models.CharField(default=str(uuid.uuid4())[0:30], primary_key=True, unique=True, max_length=30, db_column='pk')
+    id = models.CharField(default=str(uuid.uuid4())[0:30] , primary_key=True, unique=True, max_length=30, db_column='pk')
     transaction_no = models.CharField(max_length=30)
     customer_id = models.CharField(max_length=30)
     guest_id = models.CharField(max_length=255, blank=True, null=True)

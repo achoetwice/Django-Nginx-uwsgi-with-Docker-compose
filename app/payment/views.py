@@ -21,6 +21,7 @@ logger = logging.getLogger('django.request')
 # set variables
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
+account_token = os.getenv('account_token')
 
 class StoreGuestTempInfo(APIView):
     def post(self, request):
@@ -90,9 +91,9 @@ class NEWEBPAY_LEJ2_ReturnData(APIView):
     def post(self, request):
         # Get transaction data
         data = request.data
-        print ('newebpay_data', data)
+        # print ('newebpay_data', data)
         decrypt_data = NEWEBPAY_Decrypt(data['TradeInfo'])
-        print ('dec newebpay_data', decrypt_data)
+        # print ('dec newebpay_data', decrypt_data)
         shoppingcart_summary_id = decrypt_data['Result']['MerchantOrderNo']
         customer_id = GET_CUSTOMERID_BY_SUMID(shoppingcart_summary_id)
         if not customer_id:
@@ -162,7 +163,7 @@ class PayByMail(APIView):
     def get(self, request):
         temp_id = request.GET.get('temp_id')
         guest_email = request.GET.get('guest_email')
-        
+
         schedule_id = GetGuestTempInfo(temp_id).schedule_id
 
         class_info = GetClassInfo(schedule_id)
@@ -375,22 +376,12 @@ class LEJ2_Url_CustomerPaynow(APIView):
         if not customer_id:
             return APIHandler.catch('Please provide customer_id', code='003')
         customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
-        # customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
         # print('customer_cart_sum', customer_cart_sum)
         if customer_cart_items.count == 0:
             return APIHandler.catch('No class in customer\'s cart', code='024')
 
         cart_price = 0
         for shopping_cart_info in customer_cart_items:
-            # shoppingcart_id = cart_item.shoppingcart_id
-            # shopping_cart_info = GET_SHOPPINGCART_INFOS(shoppingcart_id)
-        # if shopping_cart_info == '022':
-        #     return APIHandler.catch('Missing shopping cart informations', code='022')
-        # elif not shopping_cart_info:
-        #     return APIHandler.catch('Missing temp info', code='004')
-        # logger.info (f'cart info here {shopping_cart_info}')
-        # auto_create_account = temp_info.auto_create_account
-        # THIS ONE IS FOR GUESTPAY on WEB
 
             # Get all needed class info by schedule_id
             shoppingcart_id = shopping_cart_info.id
@@ -505,11 +496,12 @@ class LEJ2_GetShoppingcart_Summary_ID(APIView):
         else:
             return APIHandler.catch(data={'summary_id':summary_id}, code='000')
 
-class PremiumCustomerPaynow(APIView):
-    def get(self, request, customer_id):
+class Url_PremiumCustomerPaynow(APIView):
+    def get(self, request, service_customer_id):
         # Redirect to newebpay page
-        premiun_price = 1000
-        pay_data = PREMIUM_NEWEBPAY(premiun_price, customer_id)
+        premium_price = 1000
+        merchant_order_no = STROE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
+        pay_data = PREMIUM_NEWEBPAY(merchant_order_no)
         if pay_data:
             return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
         else:
@@ -517,8 +509,36 @@ class PremiumCustomerPaynow(APIView):
 
 class NEWEBPAY_Premium_ReturnData(APIView):
     def post(self, request):
-        print('OOOOOOOOOOOOO')
-        return APIHandler.catch('OOOOOOOOOO', code='011')
+        # Get transaction data
+        data = request.data
+        decrypt_data = NEWEBPAY_Decrypt(data['TradeInfo'])
+        merchant_order_no = decrypt_data['Result']['MerchantOrderNo']
+        service_customer_id = GET_PREMIUM_INFO(merchant_order_no).service_customer_id
+        if not service_customer_id:
+            return APIHandler.catch('Missing premium informations', code='030')
+        if data['Status'] != 'SUCCESS':
+            logger.error (f'Fail to charge with credit card, transaction number(customer_id) {customer_id}')
+            return APIHandler.catch('Newebpay Fail to charge', code='023')
+        
+        # Upate premium privilege via account service
+        response = CALL_REQUEST('account', 'post', router=f'/customer/plan/{service_customer_id}/', token=account_token)
+        print ('response', response)
+        print ('response content', response.content)
+        # Update transaciton
+        transaction_no = UPDATE_PREMIUM_TRANSACTION(merchant_order_no)
+        if transaction_no:
+            return APIHandler.catch('Transaction success', code='014')
+        else:
+            return APIHandler.catch('go to nowhere', code='000')
 
+class Result(APIView):
+    def get(self, request):
 
+        response0 = CALL_REQUEST('account', 'get', router=f'/parse_jwt_token/', token=account_token)
+
+        print ('response0', json.loads(response0.content))
+        response1 = CALL_REQUEST('account', 'post', router=f'/customer/plan/{service_customer_id}/', token=account_token)
+        print ('response1', response1)
+        # CREATE_MULTITRANSACTION()
+        return APIHandler.catch('Missing shopping cart informations', code='022')
 
