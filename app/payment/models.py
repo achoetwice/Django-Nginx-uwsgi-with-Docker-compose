@@ -1258,7 +1258,7 @@ class ShoppingcartPremium(models.Model):
     price_prefix = models.CharField(max_length=50, default='TWD')
     lej_customer_id = models.CharField(max_length=50, null=True)
     premium_price = models.DecimalField(max_digits=15, decimal_places=2, default=0)
-    device_type = models.IntegerField(default=0)
+    device_type = models.IntegerField(null=True, default=0)
     date_added = models.DateTimeField(blank=True, null=True)
 
     def save(self, *args, **kwargs):

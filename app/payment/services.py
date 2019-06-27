@@ -1396,6 +1396,7 @@ def STROE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
     account_info = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
     account_info = json.loads(account_info.content)['data']
     lej_customer_id = account_info['lej_id']
+    device_id = account_info['device_id']
 
     premium_cart = ShoppingcartPremium.objects.create(
         merchant_order_no = '',
