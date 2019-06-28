@@ -741,9 +741,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         prof_data['profile_dob'] = learner['profile_dob']
         # print ('end of learner dob')
         prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
-        print ('end of learner note')
         for key,value in prof_data.items():
-            print ('key, value', key, ',', value)
+            # print ('key, value', key, ',', value)
             setattr(new_transactionitem_profile, key, value)
         new_transactionitem_profile.save()
     
@@ -772,10 +771,9 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
-    print ('customer_mail_send', customer_mail_send)
+    # print ('customer_mail_send', customer_mail_send)
     partner_mail_send = requests.post(partner_service,json=mail_data)
     if customer_mail_send.status_code != 200 or partner_mail_send.status_code != 200:
-        print ('customer_mail_send.status_code', customer_mail_send.status_code)
         return '020'
     customer_mail_send = eval(customer_mail_send.content)
     partner_mail_send = eval(partner_mail_send.content)
@@ -824,7 +822,7 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     date_added=timezone.now(),device_type=0,other_amount=0)
     data = {}
     last_trans = Transaction.objects.latest('transaction_no')
-    print ('latest transactions, ', last_trans)
+    # print ('latest transactions, ', last_trans)
     last_trans_no = last_trans.transaction_no
     new_transaction_number = GetNewTransNo(last_trans_no)
     data['transaction_no'] = new_transaction_number
@@ -982,7 +980,6 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     
         # Update transactionItemProfile
         for learner in temp_learners:
-            print ('learner format', learner)
             prof_data = {}
             ID = UNIQUE_ID_GENERATOR(TransactionItemProfiles)
             new_transactionitem_profile = TransactionItemProfiles.objects.create(id =ID, profile_dob = timezone.now())
@@ -1007,9 +1004,8 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
             prof_data['profile_dob'] = learner['profile_dob']
             # print ('end of learner dob')
             prof_data['profile_note'] = learner['profile_note'] if learner.get('profile_note', None) else ''
-            print ('end of learner note')
             for key,value in prof_data.items():
-                print ('key, value', key, ',', value)
+                # print ('key, value', key, ',', value)
                 setattr(new_transactionitem_profile, key, value)
             new_transactionitem_profile.save()
    
@@ -1033,11 +1029,11 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         "customer_mobile": customer_info.customer_mobile,
         "transaction_number": new_transaction_number
     }
-    print ('mail_data', mail_data)
+    # print ('mail_data', mail_data)
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
-    print ('customer_mail_send', customer_mail_send)
+    # print ('customer_mail_send', customer_mail_send)
     partner_mail_send = requests.post(partner_service,json=mail_data)
     if customer_mail_send.status_code != 200 or partner_mail_send.status_code != 200:
         print ('customer_mail_send.status_code', customer_mail_send.status_code)
@@ -1158,7 +1154,6 @@ def Update_Counter_Transaction(temp_id):
     last_trans = TransactionCounterPay.objects.latest('counter_transaction_no')
     print ('latest transactions, ', last_trans)
     last_trans_no = last_trans.counter_transaction_no
-    print ('GetNewTransNo(last_trans_no)', GetNewTransNo(last_trans_no))
     new_transaction_number = 'C' + GetNewTransNo(last_trans_no)
     data['counter_transaction_no'] = new_transaction_number
     data['guest_id'] = temp_info.guest_id
@@ -1209,7 +1204,7 @@ def Update_Counter_Transaction(temp_id):
         "customer_mobile": temp_guest.mobile,
         "transaction_number": new_transaction_number
     }
-    print ('mail data', mail_data)
+    # print ('mail data', mail_data)
     customer_service = public_url_sendmail+'/sendmail/guest/'
     partner_service = public_url_sendmail+'/sendmail/partner/'
     customer_mail_send = requests.post(customer_service,json=mail_data)
@@ -1392,9 +1387,11 @@ def LEJ2_GetTransactionNumber(summary_id):
         return False
     return trans_no
 
-def STROE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
+def STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
     account_info = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
     account_info = json.loads(account_info.content)['data']
+    if not account_info:
+        return False
     lej_customer_id = account_info['lej_id']
     device_id = account_info['device_id']
 
@@ -1435,7 +1432,7 @@ def CALL_REQUEST(service_type, method, router, data=None, token=None):
             return False
     else:
         response = False
-    print ('responseresponse', response.status_code)
+    print (f'request url : {url}, \n response status: {response.status_code}, \n response content: {response.content}')
     return response
 
 

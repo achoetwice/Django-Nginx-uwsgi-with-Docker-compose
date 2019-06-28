@@ -32,6 +32,10 @@ class StoreGuestTempInfo(APIView):
         last_name = request.data.get('customer_lastname')
         customer_mobile = request.data.get('customer_mobile')
         learners = request.data.get('learners')
+        # Check learner formation
+        for learner in learners:
+            if 'profile_name' not in learner or 'profile_dob' not in learner:
+                return APIHandler.catch('lack of informations', code='001')
         schedule_id = request.data.get('schedule_id')
         auto_create_account = request.data.get('auto_create_account', 0)
         line_id = request.data.get('line_id')
@@ -98,7 +102,7 @@ class NEWEBPAY_LEJ2_ReturnData(APIView):
         customer_id = GET_CUSTOMERID_BY_SUMID(shoppingcart_summary_id)
         if not customer_id:
             return APIHandler.catch('Missing shopping cart informations', code='022')
-        print ('shoppingcart_id', customer_id)
+        # print ('shoppingcart_id', customer_id)
         if data['Status'] != 'SUCCESS':
             logger.error (f'Fail to charge with credit card, transaction number(customer_id) {customer_id}')
             return APIHandler.catch('Newebpay Fail to charge', code='023')
@@ -115,7 +119,7 @@ class NEWEBPAY_LEJ2_ReturnData(APIView):
             return APIHandler.catch('Learner dob format not legible', code='013')
         
         else:
-            print ('trans', trans)
+            # print ('trans', trans)
             return APIHandler.catch('ok', code='014')
 
 class ECPAY_ReturnData(APIView):
@@ -144,7 +148,7 @@ class ECPAY_ReturnData(APIView):
         elif trans == '020':
             return APIHandler.catch('Sending mail failed', code='020')
         else:
-            print ('trans', trans)
+            # print ('trans', trans)
             return APIHandler.catch('ok', code='014')
 
 class PayByCounter(APIView):
@@ -181,7 +185,6 @@ class PayByMail(APIView):
             return APIHandler.catch('Lack of mail information', code='018')
         url = public_url_sendmail + '/sendmail/payment/'
         send_mail = requests.post(url, json=data)
-        print ('send_mail', eval(send_mail.content))
         send_mail = eval(send_mail.content)
         # Call email api
         # if mail sent
@@ -500,7 +503,9 @@ class Url_PremiumCustomerPaynow(APIView):
     def get(self, request, service_customer_id):
         # Redirect to newebpay page
         premium_price = 1000
-        merchant_order_no = STROE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
+        merchant_order_no = STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
+        if not merchant_order_no:
+            return APIHandler.catch('Fail to store premiun to cart', code='031')
         pay_data = PREMIUM_NEWEBPAY(merchant_order_no)
         if pay_data:
             return render(request, 'NEWEBPAY_pay.html', {'data':pay_data})
