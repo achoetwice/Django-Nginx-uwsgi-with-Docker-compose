@@ -7,7 +7,7 @@ from rest_framework.renderers import JSONRenderer
 from rest_framework.parsers import JSONParser
 import requests
 from helper.helper import APIHandler
-import logging
+import logging, random, string
 
 from payment.serializers import *
 from .models import CurrencyLists, AwardCouponHistories
@@ -39,10 +39,25 @@ class StoreGuestTempInfo(APIView):
         schedule_id = request.data.get('schedule_id')
         auto_create_account = request.data.get('auto_create_account', 0)
         line_id = request.data.get('line_id')
-        # print ('temp guest info, ', type(learners))
         if not email or not first_name or not last_name or not customer_mobile or not auto_create_account:
             return APIHandler.catch('lack of informations', code='001')
         
+        # Register if auto_create == 1
+        if auto_create_account == 1 or auto_create_account == '1':
+            letters = string.ascii_letters + string.digits
+            password = ''.join(random.choice(letters) for i in range(5))
+            register_data = {
+                'email': email,
+                'password': password,
+                'first_name': first_name,
+                'last_name': last_name,
+                'mobile': customer_mobile,
+                'country': 'Taiwan'
+            }
+            # Just don't check exist or not. If already exist, this api will automatically send mail to customer
+            response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
+            content = json.loads(response.content)
+            
         # Insert Guest information
         guest_id = SaveGuestInfos(email, first_name, last_name, customer_mobile)
         # print ('guest_id', guest_id)
@@ -283,8 +298,6 @@ class UrlGuestPaynow(APIView):
             return APIHandler.catch('Missing learner info', code='007')
         elif learner_count > class_info['vacancy']:
             return APIHandler.catch('No vacancy', code='008')
-
-        # # # Confirm age is valid
 
         guest_id = temp_info.guest_id
         
@@ -527,8 +540,7 @@ class NEWEBPAY_Premium_ReturnData(APIView):
         
         # Upate premium privilege via account service
         response = CALL_REQUEST('account', 'post', router=f'/customer/plan/{service_customer_id}/', token=account_token)
-        print ('response', response)
-        print ('response content', response.content)
+
         # Update transaciton
         transaction_no = UPDATE_PREMIUM_TRANSACTION(merchant_order_no)
         if transaction_no:

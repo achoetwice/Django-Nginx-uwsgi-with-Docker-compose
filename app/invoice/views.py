@@ -20,5 +20,10 @@ public_url_sendmail = os.getenv('public_url_sendmail')
 
 # Create invoice via ezpay
 # 開一個invoice紀錄的table, 一旦有創建或修改刪除就記錄下來（？），一樣需要同步從ezpay查到的發票紀錄
-# class CreateB2CInvoice(APIView):
-#     def post(self, request):
+class CreateB2CInvoice(APIView):
+    def post(self, request):
+        data = request.data
+        print ('data', data)
+        response = CREATE_B2C_CREDITCARD_INVOICE(data)
+        response = json.loads(response.content)
+        return APIHandler.catch(data=response, code='000')

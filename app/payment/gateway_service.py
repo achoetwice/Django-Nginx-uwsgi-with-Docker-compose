@@ -37,11 +37,11 @@ def NEWEBPAY_SHA(AES_plus):
 def NEWEBPAY_AES_decrypt(AES_info_str, key, iv):
     # print ('AES_info_str', AES_info_str)
     AES_info = AES_info_str.encode('utf-8')
-    # print ('AES_info_str22utf-8', AES_info)
+    print ('AES_info_str22utf-8', AES_info)
     AES_info = binascii.unhexlify(AES_info)
-    # print ('AES_info_unhexlify', AES_info)
+    print ('AES_info_unhexlify', AES_info)
     AES_info = AES_decrypt(AES_info, key, iv)
-    # print ('raw decrypt AES_info', AES_info)
+    print ('raw decrypt AES_info', AES_info)
     # AES_info = str(AES_info, 'ascii')
     AES_info = AES_info.decode("utf-8")
     padding_str = AES_info[-1]

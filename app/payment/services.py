@@ -12,7 +12,10 @@ from django.core.exceptions import ObjectDoesNotExist
 from django.db import transaction
 from django.utils import timezone
 from .gateway_service import *
+from invoice.services import *
+from invoice.models import InvoiceHistory
 import requests, logging
+
 
 # Get an instance of a logger
 logger = logging.getLogger('django.request')
@@ -466,7 +469,6 @@ def Update_Vacancy(schedule_id, learner_count):
         return True
 
 def GetNewTransNo(last_trans_no):
-    last_trans_no = last_trans_no.strip('C')
     if not last_trans_no:
         today_y = int(str(date.today().year)[2:4])
         today_m = date.today().month
@@ -477,6 +479,7 @@ def GetNewTransNo(last_trans_no):
         new_n = str(new_n).zfill(6)
         new_no = str(new_y) + new_m + new_n
         return new_no
+    last_trans_no = last_trans_no.strip('C')
     last_trans_y = int(last_trans_no[0:2])
     last_trans_m = int(last_trans_no[2:4])
     last_trans_n = int(last_trans_no[4:11])
@@ -539,21 +542,13 @@ def GetNewTransItemNo(last_trans_no):
 
 @transaction.atomic
 def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_return_data=None, newebpay_decrypt_data=None):
-    # credict_return_data = {'ATMAccBank': '', 'ATMAccNo': '',  'AlipayID': '', 'AlipayTradeNo': '', 'CustomField1': {'schedule_id': 'zpeexbynq0lazeymm4rs'}, 'CustomField2':{'guest_id': 'feb81dd2-8824-41d3-81b6-31f0b8a16e8c'}, 'CustomField3': '', 'CustomField4': '', 'ExecTimes': '', \
-    #     'Frequency': '', 'HandlingCharge': '55', 'ItemName': [{'profile_name': 'Candy Yo', 'profile_dob': '2016/3/28', 'profile_note': ''}, {'profile_name': 'Andrew Yo', \
-    #     'profile_dob': '2016/5/28', 'profile_note': 'cc'}],'MerchantID': '2000214', 'MerchantTradeNo': 'NO20190508043305', 'PayFrom': '', 'PaymentDate': '2019/05/08 12:33:27', \
-    #     'PaymentNo': '', 'PaymentType': 'Credit_CreditCard', 'PaymentTypeChargeFee': '55', 'PeriodAmount': '', 'PeriodType': '', 'StoreID': '',  'TenpayTradeNo': '', \
-    #     'TotalSuccessAmount': '', 'TotalSuccessTimes': '', 'TradeAmt': '2000', 'TradeDate': '2019/05/08 12:33:05', 'TradeNo': '1905081233057184', 'TradeStatus': '1', 'WebATMAccBank': '', \
-    #     'WebATMAccNo': '', 'WebATMBankName': '', 'amount': '2000', 'auth_code': '777777',  'card4no': '2222', 'card6no': '431195', \
-    #     'eci': '0', 'gwsr': '10853033', 'process_date': '2019/05/08 12:33:27', 'red_dan': '0', 'red_de_amt': '0', 'red_ok_amt': '0', 'red_yet': '0', \
-    #     'staed': '0', 'stage': '0', 'stast': '0'}
-    # schedule_id = credict_return_data['CustomField1']['schedule_id']
-    # learners = credict_return_data['ItemName']
-    # # print ('learners', learners)
-    # class_info = GetClassInfo(schedule_id)
-    # learners_count = len(learners)
+    try:
+        Card4No = newebpay_decrypt_data['Card4No']
+    except:
+        Card4No = None
+    
+    # Collect data
     credict_return_data = credict_return_data
-
     schedule_id = schedule_id
     learners = learners
     class_info = class_info
@@ -622,15 +617,14 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     vendor_code = vendor.vendor_code
     branchCode = VendorBranches.objects.get(pk = branch.branch_id).branch_code
     code_prefix = vendorCountryCode + vendor_code + branchCode
-    last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
-    
-    if last_trans_item:
+    try:
+        last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
         last_trans_item = last_trans_item[0]
         # print ('last_trans_item', last_trans_item.booking_no)
         last_trans_item_no = last_trans_item.booking_no.replace(code_prefix, '')
         new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
         item_data['booking_no'] = code_prefix + new_trans_item_no
-    else:
+    except:
         last_trans_item_no = '000000000'
         new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
         item_data['booking_no'] = code_prefix + new_trans_item_no
@@ -747,8 +741,27 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         new_transactionitem_profile.save()
     
     # Get temporary guest info, send mail, then delete
-    temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
+    temp_info = GuestTemporaryInfo.objects.get(id = temp_id)
     
+    # Create Ivoice for this transaction(Don't do this while price==0)
+    if sub_total > 0:
+        invoice_data = {
+            'ItemCount':1,
+            'ItemPrice':new_transaction.total_price,
+            'MerchantOrderNo':new_transaction.newebpay_merchant_trade_no,
+            'BuyerName':temp_info.last_name + temp_info.first_name,
+            'BuyerEmail':temp_info.email,
+            'ItemName':'課程',
+            'ItemUnit':'組',
+            'Card4No':Card4No,
+        }
+        response = CREATE_B2C_CREDITCARD_INVOICE(invoice_data)
+        try:
+            invoice_content = json.loads(response.content)
+            # No matter hiw invoice react, just continue the transaction
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk)
+        except:
+            logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
 
     # Send email to both customer and partner if Transaction done
     mail_data = {
@@ -763,8 +776,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         "class_time" : schedule.start_time + '-' + schedule.end_time,
         "price": str(sub_total),
         "payment_type": 'Credit',
-        "customer_name": temp_guest.last_name + temp_guest.first_name,
-        "customer_mobile": temp_guest.mobile,
+        "customer_name": temp_info.last_name + temp_info.first_name,
+        "customer_mobile": temp_info.mobile,
         "transaction_number": new_transaction_number
     }
     # print ('mail_data', mail_data)
@@ -782,7 +795,7 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     elif not partner_mail_send['code'] == '005000':
         return partner_mail_send
     else:
-        temp_guest.delete()
+        temp_info.delete()
         return '014'
 
 
@@ -792,6 +805,16 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
     customer_info = CustomerInfos.objects.get(id= customer_id)
     sub_total = int(customer_cart_sum.ground_total)
+
+    # # Prepare invoice data(僅供未來若要顯示交易細項時使用)
+    # invoice_item_count_list = []
+    # invoice_item_price_list = []
+    # invoice_item_name_list =[]
+
+    try:
+        Card4No = newebpay_decrypt_data['Card4No']
+    except:
+        Card4No = None
 
     '''
     for shopping_cart_info in customer_cart_items:
@@ -835,7 +858,7 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     # To add device_type from platform or not, it's a question
     # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS'}
     data['device_type'] = customer_info.device_type
-    # 我哩咧在transaction內的coupon資訊是廢欄位
+    # 在transaction內的coupon資訊是TOPEX在使用，算是綁客戶端的COUPON
     # data['lejcoupon_id'] = coupon_infos.id
     # data['lejcoupon_code'] = coupon_infos.school_coupon_code
     # data['lej_coupon_price'] = shopping_cart_info['coupon_amount']
@@ -877,24 +900,33 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         class_info = GetClassInfo(schedule_id)
         country_list = CountryLists.objects.get(country_name = vendor.vendor_country)
 
+        # Lock vacancy and update
+        learner_count = len(learners)
+        lock = Update_Vacancy(schedule_id, learner_count)
+        if not lock:
+            logger.error (f'Fail to update vacancy to this schedule_id {schedule_id}')
+            return APIHandler.catch('Vacancy not enough or schedule error', code='012')
+
         # pre-calculate
         original_price = Decimal(cart_item.coupon_amount) + Decimal(cart_item.subtotal)
         total_price = Decimal(cart_item.subtotal)
+
+        # ＃ (僅供未來若要顯示交易細項時使用)
+        # invoice_item_price_list.append(cart_item.subtotal)
 
         # Update transaction no in item
         vendorCountryCode = country_list.country_code_alpha3
         vendor_code = vendor.vendor_code
         branchCode = VendorBranches.objects.get(pk = branch.branch_id).branch_code
         code_prefix = vendorCountryCode + vendor_code + branchCode
-        last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
-        
-        if last_trans_item:
+        try:
+            last_trans_item = TransactionItems.objects.filter(booking_no__contains=code_prefix).order_by('-booking_no')
             last_trans_item = last_trans_item[0]
             # print ('last_trans_item', last_trans_item.booking_no)
             last_trans_item_no = last_trans_item.booking_no.replace(code_prefix, '')
             new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
             item_data['booking_no'] = code_prefix + new_trans_item_no
-        else:
+        except:
             last_trans_item_no = '000000000'
             new_trans_item_no = GetNewTransItemNo(last_trans_item_no)
             item_data['booking_no'] = code_prefix + new_trans_item_no
@@ -976,10 +1008,11 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         new_branch_history.save()
 
         temp_learners = deepcopy(learners)
-        # print ('WTDDDDDDDDDDDDDDD', temp_learners)
     
         # Update transactionItemProfile
+        learner_for_this_class = 0
         for learner in temp_learners:
+            learner_for_this_class += 1
             prof_data = {}
             ID = UNIQUE_ID_GENERATOR(TransactionItemProfiles)
             new_transactionitem_profile = TransactionItemProfiles.objects.create(id =ID, profile_dob = timezone.now())
@@ -1008,7 +1041,28 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
                 # print ('key, value', key, ',', value)
                 setattr(new_transactionitem_profile, key, value)
             new_transactionitem_profile.save()
-   
+        # ＃ Invoice counter(僅供未來若要顯示交易細項時使用)
+        # invoice_item_count_list.append(learner_for_this_class)
+
+    # Create Ivoice for this transaction(Don't do this while price==0)
+    if sub_total > 0:
+        invoice_data = {
+            'ItemCount':1,
+            'ItemPrice':new_transaction.total_price,
+            'MerchantOrderNo':new_transaction.newebpay_merchant_trade_no,
+            'BuyerName':customer_info.customer_lastname + customer_info.customer_firstname,
+            'BuyerEmail':customer_info.customer_email,
+            'ItemName':'課程',
+            'ItemUnit':'組',
+            'Card4No':Card4No,
+        }
+        response = CREATE_B2C_CREDITCARD_INVOICE(invoice_data)
+        try:
+            invoice_content = json.loads(response.content)
+            # No matter hiw invoice react, just continue the transaction
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk)
+        except:
+            logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
     # Send email to both customer and partner if Transaction done
     for learner in learners:
         if isinstance(learner['profile_dob'], date):
@@ -1150,10 +1204,11 @@ def Update_Counter_Transaction(temp_id):
     # Update transaction
     counter_transaction = TransactionCounterPay()
     data = {}
-
-    last_trans = TransactionCounterPay.objects.latest('counter_transaction_no')
-    print ('latest transactions, ', last_trans)
-    last_trans_no = last_trans.counter_transaction_no
+    try:
+        last_trans = TransactionCounterPay.objects.latest('counter_transaction_no')
+        last_trans_no = last_trans.counter_transaction_no
+    except:
+        last_trans_no = None
     new_transaction_number = 'C' + GetNewTransNo(last_trans_no)
     data['counter_transaction_no'] = new_transaction_number
     data['guest_id'] = temp_info.guest_id
@@ -1184,7 +1239,7 @@ def Update_Counter_Transaction(temp_id):
     counter_transaction.save()
     
     # Get temporary guest info, send mail, then delete
-    temp_guest = GuestTemporaryInfo.objects.get(id = temp_id)
+    temp_info = GuestTemporaryInfo.objects.get(id = temp_id)
     
     # Send email if Transaction done
     # Send email to both customer and partner if Transaction done
@@ -1200,8 +1255,8 @@ def Update_Counter_Transaction(temp_id):
         "class_time" : schedule.start_time + '-' + schedule.end_time,
         "price": str(sub_total),
         "payment_type": 'Cash',
-        "customer_name": temp_guest.last_name + temp_guest.first_name,
-        "customer_mobile": temp_guest.mobile,
+        "customer_name": temp_info.last_name + temp_info.first_name,
+        "customer_mobile": temp_info.mobile,
         "transaction_number": new_transaction_number
     }
     # print ('mail data', mail_data)
@@ -1220,7 +1275,7 @@ def Update_Counter_Transaction(temp_id):
     elif not partner_mail_send['code'] == '005000':
         return partner_mail_send
     else:
-        temp_guest.delete()
+        temp_info.delete()
         return new_transaction_number
 
 def GetHistroyLearners(email):
@@ -1413,7 +1468,7 @@ def GET_PREMIUM_INFO(merchant_order_no):
         return False
     return service_customer
 
-def CALL_REQUEST(service_type, method, router, data=None, token=None):
+def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None):
     if service_type == 'account':
         url = public_url_account + router
     elif service_type == 'email':
@@ -1427,7 +1482,12 @@ def CALL_REQUEST(service_type, method, router, data=None, token=None):
         if response.status_code != 200:
             return False
     elif method == 'post':
-        response = requests.post(url, headers=headers, json=data)
+        if data:
+            response = requests.post(url, headers=headers, data=data)
+        elif json:
+            response = requests.post(url, headers=headers, json=json)
+        else:
+            response = requests.post(url, headers=headers, data=None)
         if response.status_code != 200:
             return False
     else:
@@ -1472,3 +1532,21 @@ def UNIQUE_ID_GENERATOR(object, number=30):
     except:
         pass
     return ID
+
+def SAVE_INVOICE_HISTORY(invoice_content, transaction_id):
+    invoice_result = invoice_content['Result']
+    invoice_result = json.loads(invoice_result)
+    if invoice_content['Status'] != 'SUCCESS':
+        InvoiceHistory.objects.create(
+            invoice_status = invoice_content['Status']
+        )
+        return True
+    else:
+        InvoiceHistory.objects.create(
+            invoice_status = invoice_content['Status'],
+            transaction_id = transaction_id,
+            invoice_number = invoice_result['InvoiceNumber'],
+            merchant_order_number = invoice_result['MerchantOrderNo'],
+            total_amt = invoice_result['TotalAmt']
+        )
+        return True
