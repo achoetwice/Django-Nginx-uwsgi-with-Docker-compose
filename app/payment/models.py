@@ -1057,7 +1057,7 @@ class SchoolCouponClass(models.Model):
 
 
 class SchoolCouponCustomer(models.Model):
-    # pk = models.CharField(primary_key=True, max_length=30)
+    id = models.CharField(primary_key=True, max_length=30, db_column='pk')
     school_coupon_id = models.CharField(max_length=30, blank=True, null=True)
     customer_id = models.CharField(max_length=30, blank=True, null=True)
     quota = models.IntegerField()

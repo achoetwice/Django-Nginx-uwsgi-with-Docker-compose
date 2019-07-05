@@ -170,6 +170,8 @@ def LEJ2_NEWEBPAY(customer_id):
     """
     customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
     customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+    if not customer_cart_items or not customer_cart_sum:
+        return False
     shoppingcart_sum_id = customer_cart_sum.id
 
     #  Use int only because it's TWD

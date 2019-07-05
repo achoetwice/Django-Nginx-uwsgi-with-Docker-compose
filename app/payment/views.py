@@ -182,9 +182,10 @@ class PayByMail(APIView):
     def get(self, request):
         temp_id = request.GET.get('temp_id')
         guest_email = request.GET.get('guest_email')
-
-        schedule_id = GetGuestTempInfo(temp_id).schedule_id
-
+        try:
+            schedule_id = GetGuestTempInfo(temp_id).schedule_id
+        except:
+            return APIHandler.catch('Lack of temp info', code='004')
         class_info = GetClassInfo(schedule_id)
         payment_url = public_url + '/payment/url_guest_pay/' + temp_id + '/'
         data = {
@@ -200,11 +201,15 @@ class PayByMail(APIView):
             return APIHandler.catch('Lack of mail information', code='018')
         url = public_url_sendmail + '/sendmail/payment/'
         send_mail = requests.post(url, json=data)
-        send_mail = eval(send_mail.content)
+        try:
+            send_mail = eval(send_mail.content)
+        except:
+            return APIHandler.catch(data='Sending mail fail', code='018')
+
         # Call email api
         # if mail sent
         if not send_mail['code'] == '005000':
-            return APIHandler.catch(data=send_mail, code='019')
+            return APIHandler.catch(data=send_mail, code='018')
         else:
             return APIHandler.catch('Sending mail success', code='019')
 

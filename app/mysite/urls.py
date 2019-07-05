@@ -20,5 +20,6 @@ from payment import views as payment_view
 urlpatterns = [
     path('admin/', admin.site.urls),
     path('payment/', include('payment.urls')),
-    path('invoice/', include('invoice.urls'))
+    path('invoice/', include('invoice.urls')),
+    path('discount/', include('discount.urls')),
 ]
