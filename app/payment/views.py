@@ -68,6 +68,7 @@ class StoreGuestTempInfo(APIView):
                     print ('response_send_password_mail', content['code'])
                     try:
                         response_send_password_mail = requests.post(url, data)
+                        print ('!!!!!!!!!!!!!')
                     except:
                         pass
             except:
