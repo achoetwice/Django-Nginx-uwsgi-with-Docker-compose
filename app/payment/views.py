@@ -55,25 +55,47 @@ class StoreGuestTempInfo(APIView):
                 'mobile': customer_mobile,
                 'country': 'Taiwan'
             }
-            # Just don't check exist or not. If already exist, this api will automatically send mail to customer
+            # Try to register a account and login with token
             try:
                 response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
                 content = json.loads(response.content)
-                # print ('contentcontentcontent', content)
-                if content['code'] == 'S001011':
-                    url = lej_url + '/mail/forgetPassword'
-                    data = {
+                if content['code'] != 'S001011':
+                    return APIHandler.catch(data='This email address has been registered. Please check your verification email again to earn eCredits now!', code='032')
+                else:
+                    # Login and get token, if create success
+                    login_data = {
+                        'customer_email':email,
+                        'customer_password':password,
+                        'appId':4,
+                        'deviceType':2
+                    }
+                    print('111111111111')
+                    login_response = CALL_REQUEST('lej', 'post', router=f'/login', data=login_data)
+                    print('11111111111122222222')
+                    login_content = json.loads(login_response.content)
+                    login_code = login_content['code']
+                    if login_code != 0:
+                        return APIHandler.catch(data="Fail to login", code='033')
+                    else:
+                        login_content = login_content['data']
+                        print('11111111111133333333')
+                        customer_info = {
+                            'token': login_content['token'],
+                            'customerId':login_content['customer_id'],
+                            'emailActivate':login_content['email_activate']
+                        }
+
+                    # If new account, send password
+                    mail_data = {
                         'customer_email':email
                     }
                     # print ('response_send_password_mail', content['code'])
                     try:
-                        response_send_password_mail = requests.post(url, data)
-                        # print ('!!!!!!!!!!!!!')
+                        response_send_password_mail = CALL_REQUEST('lej', 'post', router=f'/mail/forgetPassword', data=mail_data)
                     except:
                         pass
             except:
-                pass
-            
+                customer_info = "Error while creating account"
         # Insert Guest information
         guest_id = SaveGuestInfos(email, first_name, last_name, customer_mobile)
         # print ('guest_id', guest_id)
@@ -82,7 +104,7 @@ class StoreGuestTempInfo(APIView):
         
         temp_id = StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id)
 
-        return APIHandler.catch(data={"temp_id":temp_id}, code='002')
+        return APIHandler.catch(data={"temp_id":temp_id, "customerInfo":customer_info}, code='002')
         # Return store id
 
 class NEWEBPAY_ReturnData(APIView):

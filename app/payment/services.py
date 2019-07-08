@@ -23,6 +23,7 @@ logger = logging.getLogger('django.request')
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
 public_url_account = os.getenv('public_url_account')
+lej_url = os.getenv('LEJ_URL')
 account_token = os.getenv('account_token')
 
 def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id):
@@ -1481,9 +1482,14 @@ def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None)
         url = public_url_account + router
     elif service_type == 'email':
         url = public_url_sendmail + router
+    elif service_type == 'lej':
+        url = lej_url + router
+        print('URLLLLLLLLLLLLLLLLL')
 
     if token:
         headers={'Authorization': 'Bearer ' + token}
+    else:
+        headers=None
 
     if method == 'get':
         response = requests.get(url, headers=headers, params=data)
