@@ -61,11 +61,11 @@ class StoreGuestTempInfo(APIView):
                 content = json.loads(response.content)
                 print ('contentcontentcontent', content)
                 if content['code'] == 'S001011':
-                    # Use old LEJ to 頂一下
                     url = lej_url + '/mail/forgetPassword'
                     data = {
                         'customer_email':email
                     }
+                    print ('response_send_password_mail', content['code'])
                     try:
                         response_send_password_mail = requests.post(url, data)
                     except:
