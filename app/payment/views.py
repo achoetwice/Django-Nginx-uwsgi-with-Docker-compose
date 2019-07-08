@@ -59,16 +59,16 @@ class StoreGuestTempInfo(APIView):
             try:
                 response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
                 content = json.loads(response.content)
-                print ('contentcontentcontent', content)
+                # print ('contentcontentcontent', content)
                 if content['code'] == 'S001011':
                     url = lej_url + '/mail/forgetPassword'
                     data = {
                         'customer_email':email
                     }
-                    print ('response_send_password_mail', content['code'])
+                    # print ('response_send_password_mail', content['code'])
                     try:
                         response_send_password_mail = requests.post(url, data)
-                        print ('!!!!!!!!!!!!!')
+                        # print ('!!!!!!!!!!!!!')
                     except:
                         pass
             except:
