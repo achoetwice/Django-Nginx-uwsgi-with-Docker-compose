@@ -22,6 +22,7 @@ logger = logging.getLogger('django.request')
 public_url = os.getenv('public_url')
 public_url_sendmail = os.getenv('public_url_sendmail')
 account_token = os.getenv('account_token')
+lej_url = os.getenv('LEJ_URL')
 
 class StoreGuestTempInfo(APIView):
     def post(self, request):
@@ -55,8 +56,21 @@ class StoreGuestTempInfo(APIView):
                 'country': 'Taiwan'
             }
             # Just don't check exist or not. If already exist, this api will automatically send mail to customer
-            response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
-            content = json.loads(response.content)
+            try:
+                response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
+                content = json.loads(response.content)
+                if content['code'] == 'S001011':
+                    # Use old LEJ to 頂一下
+                    url = lej_url + '/mail/forgetPassword'
+                    data = {
+                        'customer_email':email
+                    }
+                    try:
+                        response_send_password_mail = requests.post(url, data)
+                    except:
+                        pass
+            except:
+                pass
             
         # Insert Guest information
         guest_id = SaveGuestInfos(email, first_name, last_name, customer_mobile)

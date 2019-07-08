@@ -761,9 +761,11 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         try:
             invoice_content = json.loads(response.content)
             # No matter hiw invoice react, just continue the transaction
-            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk)
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=temp_id)
         except:
             logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
+            invoice_content = {"Status" : "Fail to get invoice"}
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=temp_id)
 
     # Send email to both customer and partner if Transaction done
     mail_data = {
@@ -805,6 +807,8 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
 def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decrypt_data=None):
     customer_cart_items = GET_CUSTOMER_CART_ITEMS(customer_id)
     customer_cart_sum = GET_CUSTOMER_CART_SUM(customer_id)
+    if not customer_cart_items or not customer_cart_sum:
+        return False
     customer_info = CustomerInfos.objects.get(id= customer_id)
     sub_total = int(customer_cart_sum.ground_total)
 
@@ -1062,9 +1066,11 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         try:
             invoice_content = json.loads(response.content)
             # No matter hiw invoice react, just continue the transaction
-            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk)
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=temp_id)
         except:
             logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
+            invoice_content = {"Status" : "Fail to get invoice"}
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=customer_cart_sum.id)
     # Send email to both customer and partner if Transaction done
     for learner in learners:
         if isinstance(learner['profile_dob'], date):
@@ -1535,20 +1541,28 @@ def UNIQUE_ID_GENERATOR(object, number=30):
         pass
     return ID
 
-def SAVE_INVOICE_HISTORY(invoice_content, transaction_id):
-    invoice_result = invoice_content['Result']
-    invoice_result = json.loads(invoice_result)
-    if invoice_content['Status'] != 'SUCCESS':
-        InvoiceHistory.objects.create(
-            invoice_status = invoice_content['Status']
-        )
-        return True
-    else:
+def SAVE_INVOICE_HISTORY(invoice_content, transaction_id, MerchantOrderNo=None):
+    try:
+        invoice_result = invoice_content['Result']
+        invoice_result = json.loads(invoice_result)
+        if invoice_content['Status'] != 'SUCCESS':
+            InvoiceHistory.objects.create(
+                invoice_status = invoice_content['Status']
+            )
+            return True
+        else:
+            InvoiceHistory.objects.create(
+                invoice_status = invoice_content['Status'],
+                transaction_id = transaction_id,
+                invoice_number = invoice_result['InvoiceNumber'],
+                merchant_order_number = invoice_result['MerchantOrderNo'],
+                total_amt = invoice_result['TotalAmt']
+            )
+            return True
+    except:
         InvoiceHistory.objects.create(
             invoice_status = invoice_content['Status'],
             transaction_id = transaction_id,
-            invoice_number = invoice_result['InvoiceNumber'],
-            merchant_order_number = invoice_result['MerchantOrderNo'],
-            total_amt = invoice_result['TotalAmt']
+            merchant_order_number = MerchantOrderNo,
         )
         return True

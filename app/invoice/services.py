@@ -104,6 +104,8 @@ def CREATE_B2C_CREDITCARD_INVOICE(data):
         'MerchantID_': INVOICE_MERCHANT_ID,
         'PostData_': AES_info_str
     }
-    response = requests.post(url=url, data=post_data)
-    
+    try:
+        response = requests.post(url=url, data=post_data)
+    except:
+        response = None
     return response
