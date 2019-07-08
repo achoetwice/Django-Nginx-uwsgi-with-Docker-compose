@@ -59,6 +59,7 @@ class StoreGuestTempInfo(APIView):
             try:
                 response = CALL_REQUEST('account', 'post', router=f'/customer/', data=register_data, token=account_token)
                 content = json.loads(response.content)
+                print ('contentcontentcontent', content)
                 if content['code'] == 'S001011':
                     # Use old LEJ to 頂一下
                     url = lej_url + '/mail/forgetPassword'
