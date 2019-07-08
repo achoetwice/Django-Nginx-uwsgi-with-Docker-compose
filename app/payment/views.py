@@ -69,16 +69,13 @@ class StoreGuestTempInfo(APIView):
                         'appId':4,
                         'deviceType':2
                     }
-                    print('111111111111')
                     login_response = CALL_REQUEST('lej', 'post', router=f'/login', data=login_data)
-                    print('11111111111122222222')
                     login_content = json.loads(login_response.content)
                     login_code = login_content['code']
                     if login_code != 0:
                         return APIHandler.catch(data="Fail to login", code='033')
                     else:
                         login_content = login_content['data']
-                        print('11111111111133333333')
                         customer_info = {
                             'token': login_content['token'],
                             'customerId':login_content['customer_id'],
@@ -96,6 +93,8 @@ class StoreGuestTempInfo(APIView):
                         pass
             except:
                 customer_info = "Error while creating account"
+        else:
+            customer_info = 'auto_create_account is set as 0'
         # Insert Guest information
         guest_id = SaveGuestInfos(email, first_name, last_name, customer_mobile)
         # print ('guest_id', guest_id)

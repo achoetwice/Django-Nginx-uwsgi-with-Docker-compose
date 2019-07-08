@@ -1484,7 +1484,6 @@ def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None)
         url = public_url_sendmail + router
     elif service_type == 'lej':
         url = lej_url + router
-        print('URLLLLLLLLLLLLLLLLL')
 
     if token:
         headers={'Authorization': 'Bearer ' + token}
