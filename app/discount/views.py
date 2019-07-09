@@ -8,6 +8,10 @@ from rest_framework.parsers import JSONParser
 
 from helper.helper import APIHandler
 from .services import *
+
+import sentry_sdk
+sentry_url = os.getenv('SENTRY_URL')
+sentry_sdk.init(sentry_url)
 # Create your views here.
 
 class Activate_Topex_Customer(APIView):

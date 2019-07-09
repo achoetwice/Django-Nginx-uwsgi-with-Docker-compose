@@ -13,7 +13,9 @@ from payment.serializers import *
 from .models import CurrencyLists, AwardCouponHistories
 from .services import *
 
-
+import sentry_sdk
+sentry_url = os.getenv('SENTRY_URL')
+sentry_sdk.init(sentry_url)
 
 # Get an instance of a logger
 logger = logging.getLogger('django.request')
@@ -26,7 +28,6 @@ lej_url = os.getenv('LEJ_URL')
 
 class StoreGuestTempInfo(APIView):
     def post(self, request):
-
         # Get datas and store
         email = request.data.get('customer_email')
         first_name = request.data.get('customer_firstname')

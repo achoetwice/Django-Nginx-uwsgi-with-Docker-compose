@@ -8,3 +8,5 @@ pytz==2019.1
 django-split-settings==0.3.0
 djangorestframework==3.9.3
 pycrypto==2.6.1
+
+sentry-sdk==0.10.0
