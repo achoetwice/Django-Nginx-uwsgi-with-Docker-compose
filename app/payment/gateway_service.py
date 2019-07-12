@@ -2,7 +2,7 @@ from Crypto.Cipher import AES
 import urllib.parse
 import binascii
 import hashlib
-import json, string
+import json, string, uuid
 
 def AES_encrypt(data, key, iv):
     cryptor = AES.new(key, AES.MODE_CBC, iv)
@@ -51,3 +51,14 @@ def NEWEBPAY_AES_decrypt(AES_info_str, key, iv):
     AES_info = json.loads(AES_info)
     # print ('AES_info2', AES_info)
     return (AES_info)
+
+def UNIQUE_ID_GENERATOR(object, number=30):
+    ID = str(uuid.uuid4())[0:number]
+    try:
+        trans_count = object.objects.filter(id=ID).count()
+        while trans_count>0:
+            ID = str(uuid.uuid4())[0:number]
+            trans_count = object.objects.filter(id=ID).count()
+    except:
+        pass
+    return ID

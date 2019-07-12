@@ -13,6 +13,7 @@ from django.db import transaction
 from django.utils import timezone
 from .gateway_service import *
 from invoice.services import *
+from discount.services import ECREDIT_VALUE_CONTROL
 from invoice.models import InvoiceHistory
 import requests, logging
 
@@ -604,11 +605,9 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     elif type(credict_return_data) is dict :
         data['ecpay_merchant_trade_no'] = credict_return_data['MerchantTradeNo']
     
-    # print ('data', data)
     for key,value in data.items():
         setattr(new_transaction, key, value)
     new_transaction.save()
-    # print ('uuid', str(uuid.uuid4()))
 
     # Update_Transaction_item
     ID = UNIQUE_ID_GENERATOR(TransactionItems)
@@ -709,7 +708,6 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
     new_branch_history.save()
 
     temp_learners = deepcopy(learners)
-    # print ('WTDDDDDDDDDDDDDDD', temp_learners)
     
     # Update transactionItemProfile
     for learner in temp_learners:
@@ -858,9 +856,7 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     data['transaction_no'] = new_transaction_number
     data['customer_id'] = customer_id
     data['ecredits_price'] = customer_cart_sum.used_ecredits
-    # data['guest_id'] = temp_info.guest_id
     data['price_prefix'] = customer_cart_sum.price_prefix
-
     data['class_count'] = len(customer_cart_items)
     # To add device_type from platform or not, it's a question
     # device_type = {0:'Guest', 1:'iOS', 2:'Android', 3:'iOS', 4:'Web', 5:'edPOS'}
@@ -877,11 +873,19 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
     elif type(credict_return_data) is dict :
         data['ecpay_merchant_trade_no'] = credict_return_data['MerchantTradeNo']
     
-    # print ('data', data)
     for key,value in data.items():
         setattr(new_transaction, key, value)
     new_transaction.save()
-    # print ('uuid', str(uuid.uuid4()))
+
+    # Update eCredit if used
+    change_point = customer_cart_sum.used_ecredits
+    add_minus = '-'
+    price_prefix = 'TWD'
+    transaction_id = new_transaction.pk
+    description = f'eCredit: {new_transaction_number}'
+    update_ecredit = ECREDIT_VALUE_CONTROL(customer_id, change_point, add_minus, price_prefix, transaction_id, description)
+    if not update_ecredit:
+        logger.error(f'Update eCredit Failed, customer_id: {customer_id}, transaction_id: {new_transaction.pk}')
 
     # Update_Transaction_item for each class
     for cart_item in customer_cart_items:
@@ -1534,17 +1538,6 @@ def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None)
 #         device_type = '2',
 #         other_amount = 2,
 #     )
-
-def UNIQUE_ID_GENERATOR(object, number=30):
-    ID = str(uuid.uuid4())[0:number]
-    try:
-        trans_count = object.objects.filter(id=ID).count()
-        while trans_count>0:
-            ID = str(uuid.uuid4())[0:number]
-            trans_count = object.objects.filter(id=ID).count()
-    except:
-        pass
-    return ID
 
 def SAVE_INVOICE_HISTORY(invoice_content, transaction_id, MerchantOrderNo=None):
     try:

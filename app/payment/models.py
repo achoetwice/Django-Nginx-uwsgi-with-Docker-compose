@@ -595,7 +595,7 @@ class DjangoSession(models.Model):
 
 
 class EcreditHistories(models.Model):
-    # pk = models.CharField(primary_key=True, max_length=30)
+    id = models.CharField(default=str(uuid.uuid4())[0:30], primary_key=True, max_length=30, db_column='pk')
     customer_id = models.CharField(max_length=30)
     change_date = models.DateField()
     date_added = models.DateTimeField(blank=True, null=True)
@@ -604,7 +604,11 @@ class EcreditHistories(models.Model):
     description = models.CharField(max_length=255, blank=True, null=True)
     price_prefix = models.CharField(max_length=5, blank=True, null=True)
     transaction_id = models.CharField(max_length=40, blank=True, null=True)
-
+    
+    def save(self, *args, **kwargs):
+        self.change_date = timezone.now().date()
+        self.date_added = timezone.now()
+        super(EcreditHistories, self).save(*args, **kwargs)
     class Meta:
         managed = False
         db_table = 'ecredit_histories'

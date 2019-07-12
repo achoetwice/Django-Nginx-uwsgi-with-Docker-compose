@@ -1,7 +1,7 @@
 from django.apps import apps
 import requests, logging
 from datetime import datetime, timedelta
-from payment.services import UNIQUE_ID_GENERATOR
+from payment.gateway_service import UNIQUE_ID_GENERATOR
 
 # Get an instance of a logger
 logger = logging.getLogger('django.request')
@@ -44,3 +44,20 @@ def REMOVE_TOPEX_CUSTOMER(customer_id):
         return 'Success'
     except:
         return 'Fail'
+
+def ECREDIT_VALUE_CONTROL(customer_id, change_point, add_minus, price_prefix='SGD', transaction_id="", description=""):
+    try:
+        EcreditHistories = apps.get_model('payment', 'EcreditHistories')
+        unique_pk = UNIQUE_ID_GENERATOR(EcreditHistories)
+        EcreditHistories.objects.create(
+            pk = unique_pk,
+            customer_id  = customer_id,
+            change_point = int(change_point),
+            add_minus = add_minus,
+            description = description,
+            price_prefix = price_prefix,
+            transaction_id = transaction_id
+        )
+        return True
+    except:
+        return False

@@ -29,3 +29,14 @@ class Activate_Topex_Customer(APIView):
         update_status = REMOVE_TOPEX_CUSTOMER(customer_id)
         return APIHandler.catch(data={"topex_id":update_status}, code='BA2')
 
+class Ecredit_Amount(APIView):
+    def post(self, request):
+        change_point = request.data.get('change_point')
+        add_minus = request.data.get('add_minus')
+        description = request.data.get('description', '')
+        customer_id = request.data.get('customer_id')
+        price_prefix = request.data.get('price_prefix', '')
+        transaction_id = request.data.get('transaction_id')
+        ECREDIT_VALUE_CONTROL(customer_id, change_point, add_minus, price_prefix, transaction_id, description)
+        return APIHandler.catch(data='Success', code='000')
+
