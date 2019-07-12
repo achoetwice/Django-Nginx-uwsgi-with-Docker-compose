@@ -1067,7 +1067,7 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         try:
             invoice_content = json.loads(response.content)
             # No matter hiw invoice react, just continue the transaction
-            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=temp_id)
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=customer_cart_sum.id)
         except:
             logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
             invoice_content = {"Status" : "Fail to get invoice"}
