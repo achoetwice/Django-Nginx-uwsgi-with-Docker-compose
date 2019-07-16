@@ -236,6 +236,70 @@ def LEJ2_NEWEBPAY(customer_id):
 
     return data
 
+def FASTLAUNCH_NEWEBPAY(fastlaunch_no, email, charge_type='CREDIT'):
+    """
+    MerchantID:藍新金流商店代號。
+    TradeInfo:1.將交易資料參數（下方列表中參數）透過商店 Key 及 IV 進行 AES 加密。
+    TradeSha:1.將交易資料經過上述 AES 加密過的字串，透過商店 Key 及 IV 進行 SHA256 加密。
+    Version:請帶 1.5
+
+    charge_tyep = ['CREDIT', 'BARCODE', 'CVS']
+    """
+    fastlaunch_price = 50
+    fastlaunch_no = fastlaunch_no
+    item_name = '上架費'
+    email=email
+    # Better Use environment variable instead
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+
+    order_params = {
+        'MerchantID': MerchantID,
+        'RespondType': 'JSON',
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.5',
+        'LangType': 'zh-tw',
+        'MerchantOrderNo': fastlaunch_no,
+        'Amt': 50,
+        'ItemDesc': item_name,
+        'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
+        # 'ExpireDate': None,
+        # 'ReturnURL': None, # 引導消費者返回商店
+        'NotifyURL': public_url + '/payment/newebpay_return_fastlaunch_data/', # 接收交易資訊
+        # 'CustomerURL': None,
+        # 'ClientBackURL': None, # 交易取消要去哪
+        'Email':email, # 交易完成通知付款人（0.0）醬方便阿
+        'EmailModify': 0,
+        'LoginType': 0,
+        # 'OrderComment': f'{id_dict}',
+        f'{charge_type}': 1
+        # 'InstFlag': 0, # 分期功能
+    }
+    print ('order_params', order_params)
+    
+    # AES encode 
+    AES_info_str = NEWEBPAY_AES(order_params, key, iv)
+
+    # SHA256 encode
+    AES_plus = 'HashKey=' + key + '&' + AES_info_str + '&' + 'HashIV=' + iv
+    SHA_info_STR = NEWEBPAY_SHA(AES_plus)
+    
+
+    data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
+        'MerchantID':MerchantID,
+        'TradeInfo':AES_info_str,
+        'TradeSha':SHA_info_STR,
+        'Version':'1.5'
+    }
+    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
+    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
+    # dec = dec['Result']['MerchantOrderNo']
+    # print ('decrypt', dec)
+
+    return data
+
 def PREMIUM_NEWEBPAY(merchant_order_no):
     # Better Use environment variable instead
 
@@ -717,7 +781,6 @@ def Update_Transaction(temp_id, schedule_id, learners, class_info, credict_retur
         # print ('new_transactionitem_profile', new_transactionitem_profile)
         prof_data['transaction_item_id'] = new_transaction_item.pk
         prof_data['profile_id'] = learner['profile_id'] if learner.get('profile_id', None) else ''
-        print('learner[profile_name]~~~~~~~~~~', learner['profile_name'])
         prof_data['profile_name'] = learner['profile_name'] if learner.get('profile_name', None) else ''
         # print ('learner[profile_dob]', learner['profile_dob'])
         if learner.get('profile_dob', None):
@@ -1126,7 +1189,11 @@ def Update_LEJ2_Transaction(customer_id, credict_return_data=None, newebpay_decr
         return '014'
 
 @transaction.atomic
-def UPDATE_PREMIUM_TRANSACTION(merchant_order_no):
+def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
+    try:
+        Card4No = newebpay_decrypt_data['Card4No']
+    except:
+        Card4No = None
 
     try:
         premium_cart = ShoppingcartPremium.objects.filter(merchant_order_no=merchant_order_no).order_by('-date_added')[0]
@@ -1146,13 +1213,83 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no):
         total_price = int(premium_cart.premium_price),
         class_count = 0,
         newebpay_merchant_trade_no = merchant_order_no,
-        device_type = premium_cart.device_type
+        device_type = premium_cart.device_type,
+        transaction_type = 1,
     )
+
+    customer_info = CustomerInfos.objects.get(id= premium_info.lej_customer_id)
+
+    # Create Ivoice for this transaction(Don't do this while price==0)
+    if int(premium_cart.premium_price) > 0:
+        invoice_data = {
+            'ItemCount':1,
+            'ItemPrice':new_transaction.total_price,
+            'MerchantOrderNo':new_transaction.newebpay_merchant_trade_no,
+            'BuyerName':customer_info.customer_firstname + customer_info.customer_lastname,
+            'BuyerEmail':customer_info.customer_email,
+            'ItemName':'特約會員',
+            'ItemUnit':'名',
+            'Card4No':Card4No,
+        }
+        response = CREATE_B2C_CREDITCARD_INVOICE(invoice_data)
+
+        try:
+            invoice_content = json.loads(response.content)
+            # No matter hiw invoice react, just continue the transaction
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
+        except:
+            logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
+            invoice_content = {"Status" : "Fail to get invoice"}
+            SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
 
     premium_info.delete()
     trans_no = new_transaction.transaction_no
     return trans_no
 
+@transaction.atomic
+def UPDATE_FASTLAUNCH_TRANSACTION(fast_launch_no):
+    ID = UNIQUE_ID_GENERATOR(Transaction)
+    last_trans = Transaction.objects.latest('transaction_no')
+    last_trans_no = last_trans.transaction_no
+    new_transaction_number = GetNewTransNo(last_trans_no)
+
+    price_prefix = 'TWD'
+    device_type = '0'
+    new_transaction = Transaction.objects.create(
+        id = ID,
+        transaction_no = new_transaction_number,
+        price_prefix = price_prefix,
+        total_price = 50,
+        class_count = 0,
+        device_type = device_type,
+        newebpay_merchant_trade_no = fast_launch_no,
+        transaction_type = 2,
+    )
+
+    # if int(premium_cart.premium_price) > 0:
+    #     invoice_data = {
+    #         'ItemCount':1,
+    #         'ItemPrice':new_transaction.total_price,
+    #         'MerchantOrderNo':new_transaction.newebpay_merchant_trade_no,
+    #         'BuyerName':customer_info.customer_firstname + customer_info.customer_lastname,
+    #         'BuyerEmail':customer_info.customer_email,
+    #         'ItemName':'特約會員',
+    #         'ItemUnit':'名',
+    #         'Card4No':Card4No,
+    #     }
+    #     response = CREATE_B2C_CREDITCARD_INVOICE(invoice_data)
+
+    #     try:
+    #         invoice_content = json.loads(response.content)
+    #         # No matter hiw invoice react, just continue the transaction
+    #         SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
+    #     except:
+    #         logger.error (f'Fail to create invoice, transaction_id = {new_transaction.pk}')
+    #         invoice_content = {"Status" : "Fail to get invoice"}
+    #         SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
+
+    trans_no = new_transaction.transaction_no
+    return trans_no
 
 @transaction.atomic
 def Update_Free_Transaction(temp_id, schedule_id, learners):
@@ -1470,7 +1607,7 @@ def STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
         premium_price = premium_price,
         lej_customer_id = lej_customer_id,
     )
-    premium_cart.merchant_order_no = f'{premium_cart.id }' + datetime.now().strftime("PREMIUM%Y%m%d%H%M%S")
+    premium_cart.merchant_order_no = f'PREMIUM{premium_cart.id}' + datetime.now().strftime("%Y%m%d%H")
     premium_cart.save()
     return premium_cart.merchant_order_no
 

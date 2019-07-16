@@ -719,7 +719,7 @@ class GuestInfos(models.Model):
 
 
 class GuestTemporaryInfo(models.Model):
-    id = models.CharField(default=str(uuid.uuid4())[0:8], primary_key=True, unique=True, max_length=255)
+    id = models.CharField(default='aaaaaa', primary_key=True, unique=True, max_length=255)
     email = models.CharField(max_length=255)
     first_name = models.CharField(max_length=255)
     last_name = models.CharField(max_length=255)
@@ -1310,6 +1310,7 @@ class Transaction(models.Model):
     message_id = models.CharField(max_length=100, blank=True, null=True)
     other_amount = models.FloatField(default=0)
     line_id = models.CharField(max_length=255, blank=True, null=True)
+    transaction_type = models.IntegerField(default=0) # 0-regular transaction 1-premium charge 2-fast launch
     # temp = models.FloatField(default=0)
 
     def save(self, *args, **kwargs):
