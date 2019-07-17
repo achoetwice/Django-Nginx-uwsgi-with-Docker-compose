@@ -26,4 +26,7 @@ urlpatterns = [
     path('lej2_clean_shoppingcart/', views.LEJ2_CleanUpShoppingCart.as_view()),
     path('lej2_shoppingcart_sumID/', views.LEJ2_GetShoppingcart_Summary_ID.as_view()),
     
+    url(r'^url_pre_authorized_pay/(?P<customer_id>[\w\x2D]+)/$', views.Url_PreAuthorized_paynow.as_view()),
+    path('newebpay_return_preauthorized_data/', views.NEWEBPAY_PreAuthorized_ReturnData.as_view()),
+    
 ]

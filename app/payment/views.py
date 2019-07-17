@@ -243,6 +243,9 @@ class ECPAY_ReturnData(APIView):
             # print ('trans', trans)
             return APIHandler.catch('ok', code='014')
 
+
+
+
 '''Payment gateway below'''
 class PayByCounter(APIView):
     def post(self, request):
@@ -615,3 +618,25 @@ class Result(APIView):
         # CREATE_MULTITRANSACTION()
         return APIHandler.catch('Missing shopping cart informations', code='022')
 
+class Url_PreAuthorized_paynow(APIView):
+    def get(self, request, customer_id):
+        pay_data = PREAUTHORIZED_NEWEBPAY(customer_id)
+        return render(request, 'NEWEBPAY1.1_pay.html', {'data':pay_data})
+
+class NEWEBPAY_PreAuthorized_ReturnData(APIView):
+    def post(self, request):
+        # Get transaction data
+        data = request.data
+        decrypt_data = json.loads(json.loads(data['JSONData'])['Result'])
+        print ('data[Result1]', decrypt_data)
+        print ('data[Result1]', type(decrypt_data))
+
+        trans = None
+        if trans:
+            return APIHandler.catch({'transaction success': trans}, code='014')
+        else:
+            return APIHandler.catch('fail', code='000')
+
+class Url_TokenCharge_paynow(APIView):
+    def post(self, request):
+        result = CHARGEBYTOKEN_NEWEBPAY()

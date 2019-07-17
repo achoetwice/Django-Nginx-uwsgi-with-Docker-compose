@@ -361,6 +361,85 @@ def PREMIUM_NEWEBPAY(merchant_order_no):
 
     return data
 
+def PREAUTHORIZED_NEWEBPAY(customer_id):
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+    
+    data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
+        'MerchantID': MerchantID,
+        'RespondType': 'JSON',
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.1',
+        'MerchantOrderNo': customer_id,
+        'Amt': 100,
+        'ItemDesc': 'item_name',
+        'Email':'f69720917@hotmail.com',
+        'LoginType': 0,
+        'CREDITAGREEMENT': 1,
+        'OrderComment': '來喔我們來簽約',
+        'TokenTerm': 'PREMIUM01',
+        'NotifyURL': public_url + '/payment/newebpay_return_preauthorized_data/', # 接收交易資訊
+    }
+    
+    CheckValue =''
+    checkitems = ['Amt','MerchantID','MerchantOrderNo','TimeStamp', 'Version']
+    for item in checkitems:
+        CheckValue+=f'{item}={data[item]}&'
+    CheckValue = CheckValue[0:-1]
+    CheckValue = 'HashKey=' + key + '&' + CheckValue + '&' + 'HashIV=' + iv
+    print ('CheckValue 1\n', CheckValue)
+    CheckValue = NEWEBPAY_SHA(CheckValue)
+    print ('CheckValue 2\n', CheckValue)
+    data['CheckValue'] = CheckValue
+    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
+    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
+    # dec = dec['Result']['MerchantOrderNo']
+    # print ('decrypt', dec)
+
+    return data
+
+def CHARGEBYTOKEN_NEWEBPAY():
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+    
+    data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
+        'MerchantID': MerchantID,
+        'RespondType': 'JSON',
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.1',
+        'MerchantOrderNo': customer_id,
+        'Amt': 100,
+        'ItemDesc': 'item_name',
+        'Email':'f69720917@hotmail.com',
+        'LoginType': 0,
+        'CREDITAGREEMENT': 1,
+        'OrderComment': '來喔我們來簽約',
+        'TokenTerm': 'PREMIUM01',
+        'NotifyURL': public_url + '/payment/newebpay_return_preauthorized_data/', # 接收交易資訊
+    }
+    
+    CheckValue =''
+    checkitems = ['Amt','MerchantID','MerchantOrderNo','TimeStamp', 'Version']
+    for item in checkitems:
+        CheckValue+=f'{item}={data[item]}&'
+    CheckValue = CheckValue[0:-1]
+    CheckValue = 'HashKey=' + key + '&' + CheckValue + '&' + 'HashIV=' + iv
+    print ('CheckValue 1\n', CheckValue)
+    CheckValue = NEWEBPAY_SHA(CheckValue)
+    print ('CheckValue 2\n', CheckValue)
+    data['CheckValue'] = CheckValue
+    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
+    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
+    # dec = dec['Result']['MerchantOrderNo']
+    # print ('decrypt', dec)
+
+    return data
+    
+
 def NEWEBPAY_Decrypt(data):
     # Better Use environment variable instead
     key = os.getenv('NEWEBPAY_KEY')
