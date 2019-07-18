@@ -501,6 +501,20 @@ class CustomerInfos(models.Model):
         managed = False
         db_table = 'customer_infos'
 
+class CustomerTokens(models.Model):
+    lej_customer_id = models.CharField(max_length=30, blank=True, null=True)
+    service_customer_id = models.CharField(max_length=50, blank=True, null=True)
+    newebpay_authorized_token = models.CharField(max_length=255, blank=True, null=True)
+    newebpay_authorized_token_life = models.DateField(blank=True, null=True)
+    created_at = models.DateTimeField(blank=True, null=True)
+    updated_at = models.DateTimeField(blank=True, null=True)
+    def save(self, *args, **kwargs):
+        self.updated_at = timezone.now()
+        super(CustomerTokens, self).save(*args, **kwargs)
+    class Meta:
+        managed = True
+        db_table = 'customer_tokens'
+
 
 class CustomerLearningPlans(models.Model):
     # pk = models.CharField(unique=True, max_length=40, blank=True, null=True)

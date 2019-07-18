@@ -1,9 +1,9 @@
 from .models import ClassSchedules, ClassOptions, ClassBranches, VendorClasses, VendorInfos, Transaction, GuestInfos, \
 CountryLists, TransactionItems, VendorBranches, BookingClasses, BranchHistories, TransactionItemProfiles, GuestTemporaryInfo, TransactionCounterPay, \
-ShoppingCarts, ShoppingcartProfiles, ShoppingcartSummaries, CustomerInfos, SchoolCouponInfos, ShoppingcartPremium
+ShoppingCarts, ShoppingcartProfiles, ShoppingcartSummaries, CustomerInfos, SchoolCouponInfos, ShoppingcartPremium, CustomerTokens
 from payment.serializers import *
 from helper.helper import APIHandler
-from datetime import datetime, date
+from datetime import datetime, date, timedelta
 import importlib.util
 from copy import deepcopy
 import pytz, json, os, uuid, time, pprint
@@ -300,9 +300,8 @@ def FASTLAUNCH_NEWEBPAY(fastlaunch_no, email, charge_type='CREDIT'):
 
     return data
 
-def PREMIUM_NEWEBPAY(merchant_order_no):
-    # Better Use environment variable instead
-
+def PREMIUM_NEWEBPAY(merchant_order_no, contract_type='Annual'):
+    
     MerchantID = os.getenv('MERCHANT_ID')
     key = os.getenv('NEWEBPAY_KEY')
     iv = os.getenv('NEWEBPAY_IV')
@@ -313,130 +312,118 @@ def PREMIUM_NEWEBPAY(merchant_order_no):
     MerchantOrderNo = premium_cart.merchant_order_no
     premium_price = int(premium_cart.premium_price)
     service_customer_id = premium_cart.service_customer_id
-
     response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
     Email = json.loads(response.content)['data']['email']
-    print ("Email", Email)
+    
+    if contract_type == 'Annual':
+        order_params = {
+            'MerchantID': MerchantID,
+            'RespondType': 'JSON',
+            'TimeStamp': f'{int(time.time())}',
+            'Version': '1.5',
+            'LangType': 'zh-tw',
+            'MerchantOrderNo': MerchantOrderNo,
+            'Amt': premium_price,
+            'ItemDesc': '特約會員優惠',
+            'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
+            # 'ExpireDate': None,
+            # 'ReturnURL': None, # 引導消費者返回商店
+            'NotifyURL': public_url + '/payment/newebpay_return_premium_data/', # 接收交易資訊
+            # 'CustomerURL': None,
+            # 'ClientBackURL': None, # 交易取消要去哪
+            # 'Email':Email, # 交易完成通知付款人（0.0）醬方便阿
+            'Email': Email,
+            'EmailModify': 0,
+            'LoginType': 0,
+            # 'OrderComment': f'{id_dict}',
+            'CREDIT': 1,
+            # 'InstFlag': 0, # 分期功能
+        }
+        print ('order_params', order_params)
+        
+        # AES encode 
+        AES_info_str = NEWEBPAY_AES(order_params, key, iv)
 
-    order_params = {
+        # SHA256 encode
+        AES_plus = 'HashKey=' + key + '&' + AES_info_str + '&' + 'HashIV=' + iv
+        SHA_info_STR = NEWEBPAY_SHA(AES_plus)
+
+        data = {
+            'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
+            'MerchantID':MerchantID,
+            'TradeInfo':AES_info_str,
+            'TradeSha':SHA_info_STR,
+            'Version':'1.5'
+        }
+
+        return data
+    
+    elif contract_type == 'Monthly':
+        data = {
+        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
         'MerchantID': MerchantID,
         'RespondType': 'JSON',
         'TimeStamp': f'{int(time.time())}',
-        'Version': '1.5',
-        'LangType': 'zh-tw',
+        'Version': '1.1',
         'MerchantOrderNo': MerchantOrderNo,
         'Amt': premium_price,
         'ItemDesc': '特約會員優惠',
-        'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
-        # 'ExpireDate': None,
-        # 'ReturnURL': None, # 引導消費者返回商店
-        'NotifyURL': public_url + '/payment/newebpay_return_premium_data/', # 接收交易資訊
-        # 'CustomerURL': None,
-        # 'ClientBackURL': None, # 交易取消要去哪
-        # 'Email':Email, # 交易完成通知付款人（0.0）醬方便阿
-        'Email': 'adamlin@rd.edallianz.com',
-        'EmailModify': 0,
-        'LoginType': 0,
-        # 'OrderComment': f'{id_dict}',
-        'CREDIT': 1,
-        # 'InstFlag': 0, # 分期功能
-    }
-    print ('order_params', order_params)
-    
-    # AES encode 
-    AES_info_str = NEWEBPAY_AES(order_params, key, iv)
-
-    # SHA256 encode
-    AES_plus = 'HashKey=' + key + '&' + AES_info_str + '&' + 'HashIV=' + iv
-    SHA_info_STR = NEWEBPAY_SHA(AES_plus)
-    
-
-    data = {
-        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
-        'MerchantID':MerchantID,
-        'TradeInfo':AES_info_str,
-        'TradeSha':SHA_info_STR,
-        'Version':'1.5'
-    }
-
-    return data
-
-def PREAUTHORIZED_NEWEBPAY(customer_id):
-    MerchantID = os.getenv('MERCHANT_ID')
-    key = os.getenv('NEWEBPAY_KEY')
-    iv = os.getenv('NEWEBPAY_IV')
-    
-    data = {
-        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
-        'MerchantID': MerchantID,
-        'RespondType': 'JSON',
-        'TimeStamp': f'{int(time.time())}',
-        'Version': '1.1',
-        'MerchantOrderNo': customer_id,
-        'Amt': 100,
-        'ItemDesc': 'item_name',
-        'Email':'f69720917@hotmail.com',
+        'Email':Email,
         'LoginType': 0,
         'CREDITAGREEMENT': 1,
-        'OrderComment': '來喔我們來簽約',
-        'TokenTerm': 'PREMIUM01',
-        'NotifyURL': public_url + '/payment/newebpay_return_preauthorized_data/', # 接收交易資訊
+        'OrderComment': '本付款包含定期續費合約，同意授權扣款將於每月自動延續會員資格，月繳99元，可於樂學遊官方網站解除續約',
+        'TokenTerm': Email,
+        'NotifyURL': public_url + '/payment/newebpay_return_premiumauthorized_data/', # 接收交易資訊
     }
-    
+
+    # Fit in checkvalue
     CheckValue =''
     checkitems = ['Amt','MerchantID','MerchantOrderNo','TimeStamp', 'Version']
     for item in checkitems:
         CheckValue+=f'{item}={data[item]}&'
     CheckValue = CheckValue[0:-1]
     CheckValue = 'HashKey=' + key + '&' + CheckValue + '&' + 'HashIV=' + iv
-    print ('CheckValue 1\n', CheckValue)
     CheckValue = NEWEBPAY_SHA(CheckValue)
-    print ('CheckValue 2\n', CheckValue)
     data['CheckValue'] = CheckValue
-    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
-    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
-    # dec = dec['Result']['MerchantOrderNo']
-    # print ('decrypt', dec)
-
     return data
 
-def CHARGEBYTOKEN_NEWEBPAY():
+def CHARGEBYTOKEN_NEWEBPAY(merchant_order_no, token):
     MerchantID = os.getenv('MERCHANT_ID')
     key = os.getenv('NEWEBPAY_KEY')
     iv = os.getenv('NEWEBPAY_IV')
+    charge_url = os.getenv('NEWEBPAY_AUTHORIZE_URL')
+
+    try:
+        premium_cart = ShoppingcartPremium.objects.get(merchant_order_no=merchant_order_no)
+    except:
+        return False
+    MerchantOrderNo = premium_cart.merchant_order_no
+    premium_price = int(premium_cart.premium_price)
+    service_customer_id = premium_cart.service_customer_id
+    response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
+    Email = json.loads(response.content)['data']['email']
+    
+    order_params = {
+        'TimeStamp': f'{int(time.time())}',
+        'Version': '1.0',
+        'MerchantOrderNo': 'PREMIUM_TIME01',
+        'Amt': premium_price,
+        'ProdDesc': '特約會員',
+        'PayerEmail': Email,
+        'TokenValue': token,
+        'TokenTerm': Email,
+        'TokenSwitch': 'on',
+    }
+
+    PostData_ = NEWEBPAY_AES(order_params, key, iv)
     
     data = {
-        'NEWEBPAY_URL':os.getenv('NEWEBPAY_URL'),
-        'MerchantID': MerchantID,
-        'RespondType': 'JSON',
-        'TimeStamp': f'{int(time.time())}',
-        'Version': '1.1',
-        'MerchantOrderNo': customer_id,
-        'Amt': 100,
-        'ItemDesc': 'item_name',
-        'Email':'f69720917@hotmail.com',
-        'LoginType': 0,
-        'CREDITAGREEMENT': 1,
-        'OrderComment': '來喔我們來簽約',
-        'TokenTerm': 'PREMIUM01',
-        'NotifyURL': public_url + '/payment/newebpay_return_preauthorized_data/', # 接收交易資訊
+        'MerchantID_ ': MerchantID,
+        'PostData_': PostData_,
+        'Pos_': 'JSON'
     }
     
-    CheckValue =''
-    checkitems = ['Amt','MerchantID','MerchantOrderNo','TimeStamp', 'Version']
-    for item in checkitems:
-        CheckValue+=f'{item}={data[item]}&'
-    CheckValue = CheckValue[0:-1]
-    CheckValue = 'HashKey=' + key + '&' + CheckValue + '&' + 'HashIV=' + iv
-    print ('CheckValue 1\n', CheckValue)
-    CheckValue = NEWEBPAY_SHA(CheckValue)
-    print ('CheckValue 2\n', CheckValue)
-    data['CheckValue'] = CheckValue
-    # AES_info_str = '3a73f7942c2a61ea7e0c90b74ad704407fee1c844a6e33937767978219287296d4b816830a93c60a257d65076b0ab07c04d5712e260db25ecca41e5b5c6f9efa30ce99342a01aaaaa1ed528c1baea8de31a69e0d07436a4cc9f03f1064243684752dada60be524495a12b643bd59e7dfcf0ddf4ec26f4f537a90b751c24308fb8a3654855d401207a78745d2eabe6a81139fa2a4449deeabd6aedddf8672b0eb93dcc2dd6fb07544e54784e740eeab3a3eb6999d982f9d89e76b982d040b31f35a6c60d75ff9c704c5144bb9e4c818e564b06ff7487b9fbe3fef5532e95fbc4c5ed7fc5092accc98a80fb5af49b21bbe01db9dd4357572d8d7f51c0a7e75f39adb3a91d75896c5220cb4530da978f4a52c313878c047fc9ecc454e6b29fe28629a7d55ad600d07390177787b09808966b7e7a2b457bebe4a3c7b4c05117ec8fc093fb8e327f7231bbd6d3d896d26c23007065befcbd532f803db22865b2907e0521ceaf41c35d8cefdc34401c141b935958c5484e76bdbd1d76cd877daacb7439f9b1e9b3952c5ea9e9e24077d0f81b5a5bdd780e17494fc1ddfc61cb50e0713d7ecedc6733d24ce3e7c2a78b90e6b6b8c67d332b29a1a293a20680133ce88ec9d86f2612afee647ee276cf73bf0e16d6f9d014ca57eab253e78e14f73001bcc'
-    # dec = NEWEBPAY_AES_decrypt(AES_info_str, key, iv)
-    # dec = dec['Result']['MerchantOrderNo']
-    # print ('decrypt', dec)
-
+    requests.post(charge_url, data=data)
     return data
     
 
@@ -1322,8 +1309,8 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
             SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
 
     premium_info.delete()
-    trans_no = new_transaction.transaction_no
-    return trans_no
+    trans_id = new_transaction.id
+    return trans_id
 
 @transaction.atomic
 def UPDATE_FASTLAUNCH_TRANSACTION(fast_launch_no):
@@ -1780,3 +1767,68 @@ def SAVE_INVOICE_HISTORY(invoice_content, transaction_id, MerchantOrderNo=None):
             merchant_order_number = MerchantOrderNo,
         )
         return True
+
+def SAVE_AUTHORIZED_TOKEN(authorized_token, toekn_life, lej_customer_id, service_customer_id):
+    try:
+        customer = CustomerTokens.objects.get(service_customer_id=service_customer_id)
+        customer.authorized_token = authorized_token
+        customer.toekn_life = toekn_life
+        customer.save()
+        return True
+    except ObjectDoesNotExist:
+        new_authorized_token = CustomerTokens.objects.create(
+            newebpay_authorized_token = authorized_token,
+            newebpay_authorized_token_life = toekn_life,
+            lej_customer_id = lej_customer_id,
+            service_customer_id = service_customer_id,
+            created_at = timezone.now()
+        )
+        return True
+    except:
+        return False
+
+def GET_AUTHORIZED_TOKEN(service_customer_id):
+    try:
+        customer = CustomerTokens.objects.get(service_customer_id=service_customer_id)
+        token = customer.authorized_token
+        return token
+    except:
+        return False
+
+def CALCULATE_PREMIUM_VALID_PERIOD(service_customer_id, plus_date):
+    # get premium info
+    response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/plan/', token=account_token)
+    content = json.loads(response.content)
+    data = content['data']
+
+    # Find latest premium record
+    try:
+        date_list = [datetime.strptime(x['end_date'], '%Y-%m-%d') for x in data]
+        max_end_date = max(date_list).strftime('%Y-%m-%d')
+        customer = next(item for item in data if item['end_date'] == max_end_date)
+    except:
+        logger.error(f'customer not exist in premium list, service_customer_id {service_customer_id}')
+        return False
+    
+    plus_date = timedelta(days=plus_date)
+    start_date = datetime.strptime(customer['start_date'], '%Y-%m-%d')
+    end_date = datetime.strptime(customer['end_date'], '%Y-%m-%d')
+    today = datetime.now()
+    print ('Original start date ', start_date, 'end date ', end_date)
+    # if now is in between period, means resume contract
+    if start_date < today < end_date:
+        update_period_data = {
+            'service_customer_id': service_customer_id,
+            'start_date': start_date.strftime('%Y-%m-%d'),
+            'end_date': (end_date + plus_date).strftime('%Y-%m-%d')
+        }
+    # if now is not in between period, means new contract
+    else:
+        update_period_data = {
+            'service_customer_id': service_customer_id,
+            'start_date': today.strftime('%Y-%m-%d'),
+            'end_date': (today + plus_date).strftime('%Y-%m-%d')
+        }
+    print ('update_period_date', update_period_data)
+    return update_period_data
+    

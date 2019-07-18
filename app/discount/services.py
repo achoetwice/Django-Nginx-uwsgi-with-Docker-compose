@@ -8,10 +8,11 @@ logger = logging.getLogger('django.request')
 
 def GET_ALL_TOPEX_MEMBER():
     SchoolCouponCustomer = apps.get_model('payment', 'SchoolCouponCustomer')
-    topex_customers = SchoolCouponCustomer.objects.all()
+    topex_customers = SchoolCouponCustomer.objects.filter(school_coupon_id='topexcoupon')
     id_list = []
     for customer in topex_customers:
-        id_list.append(customer.customer_id)
+        customer_dict = {'customer_id':customer.customer_id, 'quota':customer.quota}
+        id_list.append(customer_dict)
     return id_list
 
 def ACTIVATE_TOPEX_CUSTOMER(customer_id):
@@ -41,6 +42,18 @@ def REMOVE_TOPEX_CUSTOMER(customer_id):
         customer_list = SchoolCouponCustomer.objects.filter(customer_id = customer_id)
         for customer in customer_list:
             customer.delete()
+        return 'Success'
+    except:
+        return 'Fail'
+
+def CHANGE_TOPEX_QUOTA(customer_id, quota):
+    SchoolCouponCustomer = apps.get_model('payment', 'SchoolCouponCustomer')
+    try:
+        customer_list = SchoolCouponCustomer.objects.filter(customer_id = customer_id)
+        for customer in customer_list:
+            customer.quota = quota
+            customer.date_updated = datetime.now()
+            customer.save()
         return 'Success'
     except:
         return 'Fail'

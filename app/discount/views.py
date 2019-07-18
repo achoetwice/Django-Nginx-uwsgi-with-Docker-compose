@@ -16,8 +16,14 @@ sentry_sdk.init(sentry_url)
 
 class Activate_Topex_Customer(APIView):
     def get(self, request):
-        id_list = GET_ALL_TOPEX_MEMBER()
-        return APIHandler.catch(data={"topex_id_list":id_list}, code='BA1')
+        info_list = GET_ALL_TOPEX_MEMBER()
+        return APIHandler.catch(data=info_list, code='BA1')
+
+    def put(self, request):
+        customer_id = request.data.get('customer_id')
+        quota = request.data.get('quota')
+        update_status = CHANGE_TOPEX_QUOTA(customer_id, quota)
+        return APIHandler.catch(data={"topex_id":update_status}, code='BA3')
 
     def post(self, request):
         customer_id = request.data.get('customer_id')
