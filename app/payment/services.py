@@ -246,9 +246,17 @@ def FASTLAUNCH_NEWEBPAY(fastlaunch_no, email, charge_type='CREDIT'):
     charge_tyep = ['CREDIT', 'BARCODE', 'CVS']
     """
     fastlaunch_price = 50
+    if charge_type == 'BARCODE':
+        fastlaunch_price += 20
+        order_comment = '超商條碼固定手續費20元'
+    elif charge_type == 'CVS':
+        fastlaunch_price += 28
+        order_comment = '超商QR CODE或代碼付款固定手續費28元'
+
     fastlaunch_no = fastlaunch_no
     item_name = '上架費'
     email=email
+    
     # Better Use environment variable instead
     MerchantID = os.getenv('MERCHANT_ID')
     key = os.getenv('NEWEBPAY_KEY')
@@ -261,7 +269,7 @@ def FASTLAUNCH_NEWEBPAY(fastlaunch_no, email, charge_type='CREDIT'):
         'Version': '1.5',
         'LangType': 'zh-tw',
         'MerchantOrderNo': fastlaunch_no,
-        'Amt': 50,
+        'Amt':  fastlaunch_price,
         'ItemDesc': item_name,
         'TradeLimit': 0, # 0 for no limit, use any int number 60~900 seconds as trade time limit 
         # 'ExpireDate': None,
@@ -272,7 +280,7 @@ def FASTLAUNCH_NEWEBPAY(fastlaunch_no, email, charge_type='CREDIT'):
         'Email':email, # 交易完成通知付款人（0.0）醬方便阿
         'EmailModify': 0,
         'LoginType': 0,
-        # 'OrderComment': f'{id_dict}',
+        'OrderComment': f'{order_comment}',
         f'{charge_type}': 1
         # 'InstFlag': 0, # 分期功能
     }
@@ -1313,7 +1321,10 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
     return trans_id
 
 @transaction.atomic
-def UPDATE_FASTLAUNCH_TRANSACTION(fast_launch_no):
+def UPDATE_FASTLAUNCH_TRANSACTION(newebpay_decrypt_data):
+    fast_launch_no = newebpay_decrypt_data['MerchantOrderNo']
+    fast_launch_price = int(newebpay_decrypt_data['Amt'])
+
     ID = UNIQUE_ID_GENERATOR(Transaction)
     last_trans = Transaction.objects.latest('transaction_no')
     last_trans_no = last_trans.transaction_no
@@ -1325,22 +1336,23 @@ def UPDATE_FASTLAUNCH_TRANSACTION(fast_launch_no):
         id = ID,
         transaction_no = new_transaction_number,
         price_prefix = price_prefix,
-        total_price = 50,
+        total_price = fast_launch_price,
         class_count = 0,
         device_type = device_type,
         newebpay_merchant_trade_no = fast_launch_no,
         transaction_type = 2,
     )
 
-    # if int(premium_cart.premium_price) > 0:
+    # # 等珠力安開好資料get api
+    # if int(fast_launch_price) > 0:
     #     invoice_data = {
     #         'ItemCount':1,
     #         'ItemPrice':new_transaction.total_price,
     #         'MerchantOrderNo':new_transaction.newebpay_merchant_trade_no,
     #         'BuyerName':customer_info.customer_firstname + customer_info.customer_lastname,
     #         'BuyerEmail':customer_info.customer_email,
-    #         'ItemName':'特約會員',
-    #         'ItemUnit':'名',
+    #         'ItemName':'快速上架課程服務',
+    #         'ItemUnit':'套',
     #         'Card4No':Card4No,
     #     }
     #     response = CREATE_B2C_CREDITCARD_INVOICE(invoice_data)

@@ -1,8 +1,12 @@
+from django.apps import apps
 from Crypto.Cipher import AES
 import urllib.parse
 import binascii
 import hashlib
-import json, string, uuid
+import json, string, uuid, os, time, requests
+
+
+'''Encrypt/Decrypt'''
 
 def AES_encrypt(data, key, iv):
     cryptor = AES.new(key, AES.MODE_CBC, iv)
@@ -62,3 +66,47 @@ def UNIQUE_ID_GENERATOR(object, number=30):
     except:
         pass
     return ID
+
+
+'''Check out transactions'''
+
+def GET_TRADE_INFO(newebpay_merchant_trade_no):
+
+    Transaction = apps.get_model('payment', 'Transaction')
+    txn_info = Transaction.objects.get(newebpay_merchant_trade_no=newebpay_merchant_trade_no)
+    
+    # Collect information
+    MerchantID = os.getenv('MERCHANT_ID')
+    key = os.getenv('NEWEBPAY_KEY')
+    iv = os.getenv('NEWEBPAY_IV')
+    Version = 1.1
+    RespondType = 'JSON'
+    TimeStamp = f'{int(time.time())}'
+    MerchantOrderNo = newebpay_merchant_trade_no
+    Amt = int(txn_info.total_price)
+
+    order_params = {
+        'MerchantID':MerchantID,
+        'Version':Version,
+        'RespondType':RespondType,
+        'TimeStamp':TimeStamp,
+        'MerchantOrderNo':MerchantOrderNo,
+        'Amt':Amt,
+    }
+
+    # Fit in checkvalue
+    CheckValue =''
+    checkitems = ['Amt','MerchantID','MerchantOrderNo']
+    for item in checkitems:
+        CheckValue+=f'{item}={order_params[item]}&'
+    CheckValue = CheckValue[0:-1]
+    CheckValue = 'IV=' + iv + '&' + CheckValue + '&' + 'Key=' + key
+    CheckValue = NEWEBPAY_SHA(CheckValue)
+    order_params['CheckValue'] = CheckValue
+
+    # Request
+    url = os.getenv('NEWEBPAY_TRADE_INFO_URL')
+    response = requests.post(url, data=order_params)
+    info = json.loads(response.content)['Result']
+
+    return info
