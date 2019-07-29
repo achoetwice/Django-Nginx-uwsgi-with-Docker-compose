@@ -408,13 +408,14 @@ def CHARGEBYTOKEN_NEWEBPAY(merchant_order_no, token):
     MerchantOrderNo = premium_cart.merchant_order_no
     premium_price = int(premium_cart.premium_price)
     service_customer_id = premium_cart.service_customer_id
+    lej_customer_id = premium_cart.lej_customer_id
     response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
     Email = json.loads(response.content)['data']['email']
     
     order_params = {
         'TimeStamp': f'{int(time.time())}',
         'Version': '1.0',
-        'MerchantOrderNo': 'PREMIUM_TIME01',
+        'MerchantOrderNo': merchant_order_no,
         'Amt': premium_price,
         'ProdDesc': '特約會員',
         'PayerEmail': Email,
@@ -426,13 +427,14 @@ def CHARGEBYTOKEN_NEWEBPAY(merchant_order_no, token):
     PostData_ = NEWEBPAY_AES(order_params, key, iv)
     
     data = {
-        'MerchantID_ ': MerchantID,
+        'MerchantID_': MerchantID,
         'PostData_': PostData_,
         'Pos_': 'JSON'
     }
     
-    requests.post(charge_url, data=data)
-    return data
+    response = requests.post(charge_url, data=data)
+    response = json.loads(response.content)
+    return response
     
 
 def NEWEBPAY_Decrypt(data):
@@ -1277,12 +1279,11 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
     last_trans = Transaction.objects.latest('transaction_no')
     last_trans_no = last_trans.transaction_no
     new_transaction_number = GetNewTransNo(last_trans_no)
-    premium_info = GET_PREMIUM_INFO(merchant_order_no)
 
     new_transaction = Transaction.objects.create(
         id = ID,
         transaction_no = new_transaction_number,
-        customer_id = premium_info.lej_customer_id,
+        customer_id = premium_cart.lej_customer_id,
         price_prefix = premium_cart.price_prefix,
         total_price = int(premium_cart.premium_price),
         class_count = 0,
@@ -1291,7 +1292,7 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
         transaction_type = 1,
     )
 
-    customer_info = CustomerInfos.objects.get(id= premium_info.lej_customer_id)
+    customer_info = CustomerInfos.objects.get(id= premium_cart.lej_customer_id)
 
     # Create Ivoice for this transaction(Don't do this while price==0)
     if int(premium_cart.premium_price) > 0:
@@ -1316,7 +1317,6 @@ def UPDATE_PREMIUM_TRANSACTION(merchant_order_no, newebpay_decrypt_data=None):
             invoice_content = {"Status" : "Fail to get invoice"}
             SAVE_INVOICE_HISTORY(invoice_content, transaction_id=new_transaction.pk, MerchantOrderNo=merchant_order_no)
 
-    premium_info.delete()
     trans_id = new_transaction.id
     return trans_id
 
@@ -1673,6 +1673,7 @@ def LEJ2_GetTransactionNumber(summary_id):
 def STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price):
     account_info = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/', token=account_token)
     account_info = json.loads(account_info.content)['data']
+    print ('account_info', account_info)
     if not account_info:
         return False
     lej_customer_id = account_info['lej_id']
@@ -1802,7 +1803,7 @@ def SAVE_AUTHORIZED_TOKEN(authorized_token, toekn_life, lej_customer_id, service
 def GET_AUTHORIZED_TOKEN(service_customer_id):
     try:
         customer = CustomerTokens.objects.get(service_customer_id=service_customer_id)
-        token = customer.authorized_token
+        token = customer.newebpay_authorized_token
         return token
     except:
         return False
@@ -1812,20 +1813,25 @@ def CALCULATE_PREMIUM_VALID_PERIOD(service_customer_id, plus_date):
     response = CALL_REQUEST('account', 'get', router=f'/customer/{service_customer_id}/plan/', token=account_token)
     content = json.loads(response.content)
     data = content['data']
-
+    today = datetime.now()
+    plus_date = timedelta(days=plus_date)
     # Find latest premium record
     try:
         date_list = [datetime.strptime(x['end_date'], '%Y-%m-%d') for x in data]
         max_end_date = max(date_list).strftime('%Y-%m-%d')
         customer = next(item for item in data if item['end_date'] == max_end_date)
     except:
-        logger.error(f'customer not exist in premium list, service_customer_id {service_customer_id}')
-        return False
+        logger.info(f'customer not exist in premium list, service_customer_id {service_customer_id}')
+        update_period_data = {
+            'service_customer_id': service_customer_id,
+            'start_date': today.strftime('%Y-%m-%d'),
+            'end_date': (today + plus_date).strftime('%Y-%m-%d')
+        }
+        return update_period_data
     
-    plus_date = timedelta(days=plus_date)
     start_date = datetime.strptime(customer['start_date'], '%Y-%m-%d')
     end_date = datetime.strptime(customer['end_date'], '%Y-%m-%d')
-    today = datetime.now()
+    
     print ('Original start date ', start_date, 'end date ', end_date)
     # if now is in between period, means resume contract
     if start_date < today < end_date:

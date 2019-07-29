@@ -392,6 +392,7 @@ class LEJ2_Url_CustomerPaynow(APIView):
 class Url_PremiumCustomerPaynow(APIView):
     def get(self, request, service_customer_id, contract_type='Annual'):
         # Redirect to newebpay page
+        print ('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         if contract_type == 'Annual' or not contract_type:
             premium_price = 1000
             merchant_order_no = STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
@@ -416,9 +417,10 @@ class Url_PremiumCustomerPaynow(APIView):
         else:
             return APIHandler.catch('Contract type not correct', code='034')
         
+class Token_Charge(APIView):    
     def post(self, request):
         service_customer_id = request.data.get('service_customer_id')
-        toekn = GET_AUTHORIZED_TOKEN(service_customer_id)
+        token = GET_AUTHORIZED_TOKEN(service_customer_id)
         premium_price = 99
         if not token:
             logger.error(f'Get authorized token failed, service_customer_id {service_customer_id}')
@@ -427,6 +429,13 @@ class Url_PremiumCustomerPaynow(APIView):
         if not merchant_order_no:
             return APIHandler.catch('Fail to store premiun to cart', code='031')
         result = CHARGEBYTOKEN_NEWEBPAY(merchant_order_no, token)
+        if result['Status'] == 'SUCCESS':
+            data = result['Result']
+            transaction_id = UPDATE_PREMIUM_TRANSACTION(merchant_order_no, data)
+            return APIHandler.catch('Success to charge with token', code='036')
+        else:
+            logger.error(f'Fail to charge with token, service_customer_id {service_customer_id}')
+            return APIHandler.catch('Fail to charge with token', code='000')
 
 class Url_FastLaunch_Paynow(APIView):
     def get(self, request, charge_type, fastlaunch_no, email):
@@ -536,7 +545,7 @@ class NEWEBPAY_Premium_ReturnData(APIView):
         elif update_result['code'] != 'S001018':
             logger.error(f'Account service failed while updating premium, service_customer_id {service_customer_id}')
             
-        return APIHandler.catch('go to nowhere', code='000')
+        return APIHandler.catch('Success', code='000')
 
 class NEWEBPAY_PremiumAuthorized_ReturnData(APIView):
     def post(self, request):
@@ -574,12 +583,15 @@ class NEWEBPAY_PremiumAuthorized_ReturnData(APIView):
         update_period_data['transaction_id'] = transaction_id
         response = CALL_REQUEST('account', 'post', router=f'/customer/{service_customer_id}/plan/', data=update_period_data, token=account_token)
         update_result = json.loads(response.content)
+        if update_result['code'] != 'S001018':
+            logger.error(f'Update customer to premium failed, service_customer_id {service_customer_id}')
+            return APIHandler.catch('Update customer to premium failed', code='000')
         if not response:
             logger.error(f'Account service no response while updating premium, service_customer_id {service_customer_id}')
         elif update_result['code'] != 'S001018':
             logger.error(f'Account service failed while updating premium, service_customer_id {service_customer_id}')
         
-        return APIHandler.catch('go to nowhere', code='000')
+        return APIHandler.catch('Success', code='000')
 
 class NEWEBPAY_Fastlaunch_ReturnData(APIView):
     def post(self, request):
@@ -680,7 +692,7 @@ class LEJ2_GetShoppingcart_Summary_ID(APIView):
 
 class Newebpay_Trade_Info(APIView):
     def get(self, request, newebpay_merchant_trade_no):
-        newebpay_merchant_trade_no
+        
         trade_info = GET_TRADE_INFO(newebpay_merchant_trade_no)
         
         return APIHandler.catch(data={'trade_info':trade_info}, code='099')
@@ -693,7 +705,8 @@ class ClosePage(APIView):
 
 class Result(APIView):
     def get(self, request, newebpay_merchant_trade_no):
-        newebpay_merchant_trade_no
+
+        CHARGEBYTOKEN_NEWEBPAY(merchant_order_no, token)
         trade_info = GET_TRADE_INFO(newebpay_merchant_trade_no)
         
         # print ('OOOOOOOOOOOOo', update_result)
