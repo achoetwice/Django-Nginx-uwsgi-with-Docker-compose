@@ -392,7 +392,6 @@ class LEJ2_Url_CustomerPaynow(APIView):
 class Url_PremiumCustomerPaynow(APIView):
     def get(self, request, service_customer_id, contract_type='Annual'):
         # Redirect to newebpay page
-        print ('!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!')
         if contract_type == 'Annual' or not contract_type:
             premium_price = 1000
             merchant_order_no = STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
@@ -424,7 +423,7 @@ class Token_Charge(APIView):
         premium_price = 99
         if not token:
             logger.error(f'Get authorized token failed, service_customer_id {service_customer_id}')
-            return APIHandler.catch('Get authorized token failed', code='000')
+            return APIHandler.catch('This customer has no charge token', code='037')
         merchant_order_no = STORE_SHOPPINGCART_PREMIUM(service_customer_id, premium_price)
         if not merchant_order_no:
             return APIHandler.catch('Fail to store premiun to cart', code='031')
@@ -432,7 +431,7 @@ class Token_Charge(APIView):
         if result['Status'] == 'SUCCESS':
             data = result['Result']
             transaction_id = UPDATE_PREMIUM_TRANSACTION(merchant_order_no, data)
-            return APIHandler.catch('Success to charge with token', code='036')
+            return APIHandler.catch({'transaction_id':transaction_id}, code='036')
         else:
             logger.error(f'Fail to charge with token, service_customer_id {service_customer_id}')
             return APIHandler.catch('Fail to charge with token', code='000')
@@ -537,7 +536,6 @@ class NEWEBPAY_Premium_ReturnData(APIView):
         plus_date = 365
         update_period_data = CALCULATE_PREMIUM_VALID_PERIOD(service_customer_id, plus_date)
         update_period_data['transaction_id'] = transaction_id
-        print ('transaction_idtransaction_idtransaction_idtransaction_idtransaction_id', update_period_data)
         response = CALL_REQUEST('account', 'post', router=f'/customer/{service_customer_id}/plan/', data=update_period_data, token=account_token)
         update_result = json.loads(response.content)
         if not response:

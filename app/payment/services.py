@@ -27,6 +27,39 @@ public_url_account = os.getenv('public_url_account')
 lej_url = os.getenv('LEJ_URL')
 account_token = os.getenv('account_token')
 
+def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None):
+    if service_type == 'account':
+        url = public_url_account + router
+    elif service_type == 'email':
+        url = public_url_sendmail + router
+    elif service_type == 'lej':
+        url = lej_url + router
+    elif service_type == 'self':
+        url = public_url + '/payment' + router
+
+    if token:
+        headers={'Authorization': 'Bearer ' + token}
+    else:
+        headers=None
+
+    if method == 'get':
+        response = requests.get(url, headers=headers, params=data)
+        if response.status_code != 200:
+            return False
+    elif method == 'post':
+        if data:
+            response = requests.post(url, headers=headers, data=data)
+        elif json:
+            response = requests.post(url, headers=headers, json=json)
+        else:
+            response = requests.post(url, headers=headers, data=None)
+        if response.status_code != 200:
+            return False
+    else:
+        response = False
+    print (f'request url : {url}, \n response status: {response.status_code}, \n response content: {response.content}')
+    return response
+
 def StoreTempInfo(email, first_name, last_name, customer_mobile, learners, schedule_id, auto_create_account, guest_id, line_id):
     ID = UNIQUE_ID_GENERATOR(GuestTemporaryInfo, number=8)
     New_temp_info = GuestTemporaryInfo.objects.create(id =ID, email = email, first_name = first_name, last_name = last_name, mobile = customer_mobile, \
@@ -1696,39 +1729,6 @@ def GET_PREMIUM_INFO(merchant_order_no):
     except:
         return False
     return service_customer
-
-def CALL_REQUEST(service_type, method, router, data=None, json=None, token=None):
-    if service_type == 'account':
-        url = public_url_account + router
-    elif service_type == 'email':
-        url = public_url_sendmail + router
-    elif service_type == 'lej':
-        url = lej_url + router
-
-    if token:
-        headers={'Authorization': 'Bearer ' + token}
-    else:
-        headers=None
-
-    if method == 'get':
-        response = requests.get(url, headers=headers, params=data)
-        if response.status_code != 200:
-            return False
-    elif method == 'post':
-        if data:
-            response = requests.post(url, headers=headers, data=data)
-        elif json:
-            response = requests.post(url, headers=headers, json=json)
-        else:
-            response = requests.post(url, headers=headers, data=None)
-        if response.status_code != 200:
-            return False
-    else:
-        response = False
-    print (f'request url : {url}, \n response status: {response.status_code}, \n response content: {response.content}')
-    return response
-
-
 
 # def CREATE_MULTITRANSACTION():
 #     ID = UNIQUE_ID_GENERATOR(Transaction)

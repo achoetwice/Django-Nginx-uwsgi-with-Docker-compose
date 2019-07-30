@@ -12,6 +12,8 @@ services:
       - ./conf.d/uwsgi.ini:/uwsgi/uwsgi.ini
     env_file:
       - ./payment.env
+    links:
+      - rabbitmq
   nginx:
     image: nginx
     volumes:
@@ -21,3 +23,28 @@ services:
       - "${PORT}:8000"
     links:
       - api
+  rabbitmq:
+    image:  rabbitmq:3.7.3-management
+    # env_file: 
+    #   - ./.env
+    environment:
+      RABBITMQ_DEFAULT_USER: celery 
+      RABBITMQ_DEFAULT_PASS: password123  
+      RABBITMQ_DEFAULT_VHOST: my_vhost
+    ports:
+      - "$RABBIT_MQ_PORT1:5672"
+      - "$RABBIT_MQ_PORT2:15672"
+  celery:
+    build: 
+      context: .
+      dockerfile: app.dockerfile
+    environment:
+      - C_FORCE_ROOT=true
+    env_file:
+      - ./payment.env
+    command: bash -c "cd app && celery -A mysite worker -B -l debug"
+    volumes:
+      - ./app:/app
+      - ./conf.d/uwsgi.ini:/uwsgi/uwsgi.ini
+    links:
+      - rabbitmq
