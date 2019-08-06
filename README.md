@@ -1,4 +1,4 @@
-## A example for Django+Nginx+uwsgi with Dcoker-compose
+## An example for Django+Nginx+uwsgi with Dcoker-compose
 Here is the example of how to build a complete service with docker-compose. Docker-compose.yml and app.dockerfile should be helpful as a reference.\
 But notice that, this project won't be working or doing anything fuctional, since there are environment variables not been provided by me, that's intentional.\
 Make a project easy to deploy with docker, while it's hard to steal credential data use envfiles, that the idea.\
