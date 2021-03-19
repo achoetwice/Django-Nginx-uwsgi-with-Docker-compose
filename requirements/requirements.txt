@@ -6,7 +6,7 @@ python-dateutil==2.8.0
 urllib3==1.24.3
 pytz==2019.1
 django-split-settings==0.3.0
-djangorestframework==3.9.3
+djangorestframework==3.11.2
 pycrypto==2.6.1
 
 sentry-sdk==0.10.0
